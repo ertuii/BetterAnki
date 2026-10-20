@@ -24,7 +24,7 @@ Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen �
 
 **Zusatzfunktionen** (gibt es in Anki nicht, einzeln einschaltbar unter *Einstellungen → Zusatzfunktionen*):
 
-- **Prüfungstermine:** Klausurdatum pro Stapel; die App rechnet aus, wie viele neue Karten pro Tag nötig sind (die letzten Tage bleiben fürs Wiederholen) und markiert die Prüfung im Zeitstrahl
+- **Prüfungstermine:** eigene Seite *Prüfungen*, Klausurdatum pro Stapel; die App rechnet aus, wie viele neue Karten pro Tag nötig sind (die letzten Tage bleiben fürs Wiederholen) und markiert die Prüfung im Zeitstrahl
 - **Lernplan:** Dauer wählen und über alle Stapel lernen, nahe Prüfungen zuerst
 - **Schwachstellen:** Themen und Stapel unter deinem Durchschnitt in der Statistik, mit „Üben“ für die vergessenen Karten
 

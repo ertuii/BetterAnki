@@ -68,7 +68,7 @@
   {/if}
   {#if examMarks.length}
     <div class="marks" style:grid-template-columns="repeat({cells.length}, 1fr)">
-      {#each examMarks as m}<span style:grid-column="{m.col} / span 1" title="Prüfung: {m.label}"><b>{m.label}</b></span>{/each}
+      {#each examMarks as m}<span style:grid-column="{m.col} / span 1" title="Prüfung: {m.label}" aria-label="Prüfung: {m.label}"></span>{/each}
     </div>
   {/if}
   <div class="months" style:grid-template-columns="repeat({cells.length}, 1fr)">
@@ -98,8 +98,7 @@
   .future { background: transparent; border: 1px dashed var(--rule-2); }
   .future.has { border-style: solid; border-color: var(--heat-2); }
   .marks { display: grid; margin-top: 4px; }
-  .marks span { grid-row: 1; position: relative; height: 18px; border-left: 2px solid var(--ink); }
-  .marks b { position: absolute; right: calc(100% + 4px); top: 2px; font-size: 12px; white-space: nowrap; }
+  .marks span { grid-row: 1; height: 8px; margin: 0 auto; width: 8px; border-radius: 50%; background: var(--ink); }
   .months { display: grid; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
   .months span { grid-row: 1; white-space: nowrap; }
 </style>

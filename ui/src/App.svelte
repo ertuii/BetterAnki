@@ -1,5 +1,5 @@
 <script>
-  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon } from '@lucide/svelte'
+  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon, GraduationCap } from '@lucide/svelte'
   import { api, flatten, hueFor, total } from './lib/api.js'
   import Today from './lib/Today.svelte'
   import Study from './lib/Study.svelte'
@@ -11,6 +11,7 @@
   import Settings from './lib/Settings.svelte'
   import ImportDialog from './lib/ImportDialog.svelte'
   import Inbox from './lib/Inbox.svelte'
+  import Exams from './lib/Exams.svelte'
 
   let view = $state(/** @type {any} */ ({ name: 'today' }))
   let decks = $state([])
@@ -106,6 +107,9 @@
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
       <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
+      {#if overview?.features.exams}
+        <button class="nav" class:on={view.name === 'exams'} onclick={() => go('exams')}><GraduationCap size={17} />Prüfungen</button>
+      {/if}
       {#if overview?.inbox || view.name === 'inbox'}
         <button class="nav" class:on={view.name === 'inbox'} onclick={() => go('inbox')}>
           <InboxIcon size={17} />Eingang<span class="count num badge">{overview?.inbox || ''}</span>
@@ -146,6 +150,8 @@
       <NoteTypes {notify} />
     {:else if view.name === 'settings'}
       <Settings {notify} {refresh} {checkUpdate} />
+    {:else if view.name === 'exams' && overview}
+      <Exams {flat} {overview} {run} {notify} />
     {:else if view.name === 'inbox'}
       <Inbox {flat} {notify} {refresh} />
     {:else if view.name === 'stats'}
