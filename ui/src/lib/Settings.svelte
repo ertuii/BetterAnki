@@ -12,11 +12,60 @@
   let backups = $state([])
   let backingUp = $state(false)
   let confirmRestore = $state(null)
-  let folder = $state('')
-  let mcp = $state('')
+  let storage = $state(null)
+  let moveTarget = $state(null) // {folder, has_collection, synced_folder}
+  let moving = $state(false)
+  let claude = $state(null)
+  let connecting = $state(null)
 
   async function load() {
-    ;[account, backups, folder, mcp] = await Promise.all([api.sync_account(), api.backups(), api.data_folder(), api.mcp_command()])
+    ;[account, backups, storage, claude] = await Promise.all([api.sync_account(), api.backups(), api.storage(), api.claude_status()])
+  }
+
+  async function chooseFolder() {
+    try {
+      const folder = await api.pick_folder()
+      if (!folder) return
+      const check = await api.check_storage_target(folder)
+      if (check.same) return notify('Das ist bereits der Speicherort.')
+      moveTarget = { folder, ...check }
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  async function applyStorage(mode, folder = moveTarget.folder) {
+    moving = true
+    try {
+      notify(await api.change_storage(folder, mode))
+      moveTarget = null
+      await Promise.all([load(), refresh()])
+    } catch (e) {
+      fail(e)
+    } finally {
+      moving = false
+    }
+  }
+
+  async function connect(target) {
+    connecting = target
+    try {
+      notify(await api.connect_claude(target))
+      claude = await api.claude_status()
+    } catch (e) {
+      fail(e)
+    } finally {
+      connecting = null
+    }
+  }
+
+  async function disconnect(target) {
+    try {
+      await api.disconnect_claude(target)
+      claude = await api.claude_status()
+    } catch (e) {
+      fail(e)
+    }
   }
 
   const fail = (e) => notify(String(e?.message ?? e), true)
@@ -113,7 +162,10 @@
   }
 
   const when = (t) => new Date(t * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
-  const claudeCode = $derived(`claude mcp add betteranki -- ${mcp}`)
+  const CLIENTS = [
+    { key: 'desktop', name: 'Claude Desktop', hint: 'Die Claude-App für Mac und Windows. Danach Claude Desktop einmal neu starten.' },
+    { key: 'code', name: 'Claude Code', hint: 'Claude im Terminal oder in der IDE. Gilt für alle neuen Sitzungen.' },
+  ]
 
   load()
 </script>
@@ -177,15 +229,71 @@
 
   <section>
     <h2>Claude verbinden</h2>
-    <p class="muted">Damit Claude Karten anlegen, suchen und bearbeiten kann. In Claude Code im Terminal ausführen:</p>
-    <div class="cmd"><code>{claudeCode}</code><button class="plain sm" aria-label="Befehl kopieren" onclick={() => copy(claudeCode)}><Copy size={16} /></button></div>
-    <p class="muted small">Für Claude Desktop: als MCP-Server mit diesem Befehl eintragen: <code>{mcp}</code></p>
+    <p class="muted">Ein Klick, und Claude kann deine Karten anlegen, durchsuchen und bearbeiten. Frag danach einfach: „Erstelle 10 Karten zu Integralrechnung im Stapel Analysis II.“</p>
+    {#if claude?.unstable_location}
+      <p class="choice">Verschiebe BetterAnki zuerst in den Ordner <b>Programme</b> und öffne es von dort. Sonst zeigt Claude ins Leere, sobald die App verschoben wird.</p>
+    {/if}
+    {#if claude}
+      <ul class="clients">
+        {#each CLIENTS as c}
+          {@const st = claude[c.key]}
+          <li>
+            <div>
+              <b>{c.name}</b>
+              <span class="state {st.state}">{!st.installed ? 'nicht installiert' : st.state === 'on' ? 'verbunden' : st.state === 'outdated' ? 'Pfad veraltet' : 'nicht verbunden'}</span>
+              <p class="muted small">{c.hint}</p>
+            </div>
+            {#if st.state === 'on'}
+              <button class="ghost sm" onclick={() => disconnect(c.key)}>Trennen</button>
+            {:else}
+              <button class="sm" disabled={!st.installed || connecting === c.key} onclick={() => connect(c.key)}>
+                {connecting === c.key ? 'Verbinde …' : st.state === 'outdated' ? 'Aktualisieren' : 'Verbinden'}
+              </button>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <details>
+        <summary class="muted small">Andere MCP-Clients</summary>
+        <div class="cmd"><code>{claude.command}</code><button class="plain sm" aria-label="Befehl kopieren" onclick={() => copy(claude.command)}><Copy size={16} /></button></div>
+      </details>
+    {/if}
   </section>
 
   <section>
-    <h2>Daten</h2>
-    <p class="muted">Deine Sammlung liegt nur auf diesem Rechner:</p>
-    <div class="cmd"><code>{folder}</code><button class="plain sm" aria-label="Pfad kopieren" onclick={() => copy(folder)}><Copy size={16} /></button></div>
+    <h2>Speicherort</h2>
+    <p class="muted">Hier liegen deine Karten, Medien und Sicherungen. Du kannst einen anderen Ordner wählen, z. B. eine externe Festplatte.</p>
+    {#if storage}
+      <div class="cmd"><code>{storage.dir}</code><button class="plain sm" aria-label="Pfad kopieren" onclick={() => copy(storage.dir)}><Copy size={16} /></button></div>
+      {#if storage.synced_folder}
+        <p class="choice">Dieser Ordner wird von einem Cloud-Dienst synchronisiert (OneDrive, iCloud, Dropbox …). Das kann die geöffnete Datenbank beschädigen. Für den Abgleich zwischen Geräten ist AnkiWeb sicherer.</p>
+      {/if}
+      <div class="row">
+        <button class="ghost" disabled={moving} onclick={chooseFolder}>Anderen Ordner wählen …</button>
+        {#if !storage.is_default}
+          <button class="plain" disabled={moving} onclick={() => applyStorage('move', storage.default)}>Zurück zum Standardordner</button>
+        {/if}
+      </div>
+      {#if moveTarget}
+        <div class="choice">
+          <b>{moveTarget.folder}</b>
+          {#if moveTarget.synced_folder}<p>Achtung: Dieser Ordner wird von einem Cloud-Dienst synchronisiert, das kann die Datenbank beschädigen.</p>{/if}
+          {#if moveTarget.has_collection}
+            <p>Dort liegt bereits eine Sammlung. BetterAnki kann sie öffnen; deine aktuelle Sammlung bleibt unverändert am alten Ort.</p>
+            <div class="row">
+              <button disabled={moving} onclick={() => applyStorage('open')}>Vorhandene Sammlung öffnen</button>
+              <button class="ghost" onclick={() => (moveTarget = null)}>Abbrechen</button>
+            </div>
+          {:else}
+            <p>Deine Sammlung wird mit Medien und Sicherungen dorthin kopiert und ab sofort dort verwendet. Die alten Dateien bleiben als Kopie liegen.</p>
+            <div class="row">
+              <button disabled={moving} onclick={() => applyStorage('move')}>{moving ? 'Kopiere …' : 'Hierhin verschieben'}</button>
+              <button class="ghost" onclick={() => (moveTarget = null)}>Abbrechen</button>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    {/if}
   </section>
 </div>
 
@@ -204,6 +312,14 @@
   .choice p { font-size: 14px; }
   .cmd { display: flex; align-items: center; gap: 8px; background: var(--paper-2); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
   .cmd code { flex: 1; font: 13px/1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; overflow-wrap: anywhere; }
-  p code { font: 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--paper-2); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
   .w { width: 1%; white-space: nowrap; }
+  .clients { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+  .clients li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .clients li:last-child { border-bottom: 0; }
+  .clients b { margin-right: 8px; }
+  .state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--paper-3); color: var(--ink-2); }
+  .state.on { background: color-mix(in srgb, var(--m-green) 16%, var(--paper)); color: var(--m-green); }
+  .state.outdated { background: var(--warn-bg); color: var(--warn-ink); }
+  details summary { cursor: pointer; margin-bottom: 8px; }
+  .choice b { overflow-wrap: anywhere; }
 </style>

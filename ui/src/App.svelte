@@ -9,6 +9,7 @@
   import DeckOptions from './lib/DeckOptions.svelte'
   import NoteTypes from './lib/NoteTypes.svelte'
   import Settings from './lib/Settings.svelte'
+  import ImportDialog from './lib/ImportDialog.svelte'
 
   let view = $state(/** @type {any} */ ({ name: 'today' }))
   let decks = $state([])
@@ -40,9 +41,22 @@
     }
   }
 
+  let importing = $state(null) // path of the file in the import dialog
+  let dragging = $state(false)
+
   async function importFile() {
-    const path = await api.pick_import_file()
-    if (path) await run(() => api.import_file(path), (r) => `Importiert: ${r}`)
+    try {
+      const path = await api.pick_import_file()
+      if (path) importing = path
+    } catch (e) {
+      notify(String(e?.message ?? e), true)
+    }
+  }
+
+  // app.py calls this when a file is dropped onto the window
+  /** @type {any} */ (window).__baImport = (path) => {
+    dragging = false
+    importing = path
   }
 
   function go(name, extra = {}) {
@@ -100,6 +114,19 @@
   </main>
 </div>
 
+{#if importing}
+  <ImportDialog path={importing} {flat} {notify} onDone={() => { importing = null; refresh() }} onClose={() => (importing = null)} />
+{/if}
+
+<svelte:window
+  ondragover={(e) => { if (!e.dataTransfer?.types.includes('Files')) return; e.preventDefault(); dragging = true }}
+  ondragleave={(e) => !e.relatedTarget && (dragging = false)}
+  ondrop={(e) => { e.preventDefault(); dragging = false }} />
+
+{#if dragging}
+  <div class="drop" aria-hidden="true"><div>Zum Importieren loslassen<span>.apkg, .colpkg oder CSV</span></div></div>
+{/if}
+
 {#if toast}
   <div class="toast" class:error={toast.error} role="status">{toast.text}</div>
 {/if}
@@ -138,6 +165,9 @@
     font-weight: 500; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); max-width: 70ch;
     animation: rise 220ms var(--ease);
   }
+  .drop { position: fixed; inset: 12px; border: 2px dashed var(--ink-2); border-radius: 16px; background: color-mix(in srgb, var(--paper) 88%, transparent); display: grid; place-items: center; z-index: 40; pointer-events: none; }
+  .drop div { font-size: 22px; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .drop span { font-size: 14px; font-weight: 500; color: var(--ink-2); }
   .toast.error { background: var(--m-red); color: #fff; }
   @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
 </style>

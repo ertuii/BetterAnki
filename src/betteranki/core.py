@@ -39,8 +39,40 @@ def data_dir() -> Path:
     return d
 
 
+def _config_file() -> Path:
+    return data_dir() / "config.json"
+
+
+def load_config() -> dict:
+    import json
+
+    f = _config_file()
+    return json.loads(f.read_text()) if f.exists() else {}
+
+
+def save_config(**changes) -> None:
+    import json
+
+    _config_file().write_text(json.dumps({**load_config(), **changes}, indent=2))
+
+
+def collection_dir() -> Path:
+    """Where the collection (cards, media, backups) lives. Default: the app data folder; user-selectable."""
+    d = Path(load_config().get("collection_dir") or data_dir())
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 def collection_path() -> str:
-    return str(data_dir() / "collection.anki2")
+    return str(collection_dir() / "collection.anki2")
+
+
+_SYNCED_FOLDERS = ("onedrive", "icloud", "mobile documents", "dropbox", "google drive", "cloudstorage", "nextcloud", "box sync")
+
+
+def looks_synced(path: Path) -> bool:
+    """Cloud-sync clients can corrupt an open SQLite database (Anki warns about the same)."""
+    return any(part in str(path).lower() for part in _SYNCED_FOLDERS)
 
 
 def _locked(fn):
@@ -316,7 +348,7 @@ class Core:
     # ---------- backups & AnkiWeb sync ----------
 
     def _backup_dir(self) -> Path:
-        d = data_dir() / "backups"
+        d = Path(self._col.path).parent / "backups"
         d.mkdir(exist_ok=True)
         return d
 
@@ -708,7 +740,28 @@ class Core:
     # ---------- import / export ----------
 
     @_locked
-    def import_file(self, path: str) -> str:
+    def inspect_import(self, path: str) -> dict:
+        """What the import dialog needs to know before importing."""
+        ext = Path(path).suffix.lower()
+        info = {"path": path, "name": Path(path).name, "kind": {".apkg": "apkg", ".colpkg": "colpkg"}.get(ext, "csv")}
+        if ext not in (".apkg", ".colpkg", ".csv", ".txt", ".tsv"):
+            raise ValueError(f"„{Path(path).name}“ kann nicht importiert werden. Unterstützt: .apkg, .colpkg, .csv, .txt, .tsv")
+        if info["kind"] == "csv":
+            meta = self._col.get_csv_metadata(path, None)
+            rows = [list(r.vals) for r in meta.preview][:6]
+            info.update(
+                columns=max((len(r) for r in rows), default=0),
+                preview=rows,
+                notetype_id=meta.global_notetype.id,
+                field_columns=list(meta.global_notetype.field_columns),
+                tags_column=meta.tags_column,
+            )
+        return info
+
+    @_locked
+    def import_file(self, path: str, deck=None, notetype_id: int | None = None,
+                    field_columns: list[int] | None = None, tags_column: int | None = None) -> str:
+        """CSV options: deck (name or id), notetype_id, field_columns (1-based column per field, 0 = empty), tags_column."""
         ext = Path(path).suffix.lower()
         if ext == ".apkg":
             req = ImportAnkiPackageRequest(
@@ -721,6 +774,17 @@ class Core:
             return "Sammlung ersetzt (vorherige als Sicherung behalten)"
         elif ext in (".csv", ".txt", ".tsv"):
             meta = self._col.get_csv_metadata(path, None)
+            if deck is not None:
+                meta.deck_id = deck if isinstance(deck, int) else self._col.decks.id(deck)
+            if notetype_id:
+                meta.global_notetype.id = notetype_id
+                if field_columns is None:  # columns in order onto the new type's fields
+                    field_columns = [i + 1 for i in range(len(self._col.models.get(notetype_id)["flds"]))]
+            if field_columns is not None:
+                del meta.global_notetype.field_columns[:]
+                meta.global_notetype.field_columns.extend(field_columns)
+            if tags_column is not None:
+                meta.tags_column = tags_column
             log = self._col.import_csv(ImportCsvRequest(path=path, metadata=meta)).log
         else:
             raise ValueError("unterstützt: .apkg, .colpkg, .csv, .txt, .tsv")
@@ -739,18 +803,80 @@ class Core:
         """Whole collection as .colpkg (for moving to another computer or Anki itself)."""
         self._col.export_collection_package(path, include_media=media, legacy=False)
 
-    def mcp_command(self) -> str:
-        """The command Claude should run to start the MCP server for this installation."""
-        if getattr(sys, "frozen", False):
-            return f'"{sys.executable}" --mcp'
-        return f'uv run --directory "{Path(__file__).resolve().parents[2]}" betteranki --mcp'
+    # ---------- storage location ----------
+
+    def storage(self) -> dict:
+        d = Path(self._col.path).parent
+        return {"dir": str(d), "default": str(data_dir()), "is_default": d == data_dir(), "synced_folder": looks_synced(d)}
+
+    def pick_folder(self) -> str | None:
+        import webview
+
+        res = self._window.create_file_dialog(webview.FileDialog.FOLDER)
+        return res[0] if res else None
+
+    def check_storage_target(self, folder: str) -> dict:
+        d = Path(folder)
+        return {"has_collection": (d / "collection.anki2").exists(), "synced_folder": looks_synced(d),
+                "same": d.resolve() == Path(self._col.path).parent.resolve()}
+
+    @_locked
+    def change_storage(self, folder: str, mode: str = "move") -> str:
+        """mode 'move': copy the current collection (with media and backups) into folder and use it there;
+        the old files stay where they were as a copy. mode 'open': switch to a collection already in folder."""
+        import shutil
+
+        target = Path(folder)
+        src_dir = Path(self._col.path).parent
+        if target.resolve() == src_dir.resolve():
+            return "Das ist bereits der Speicherort."
+        if mode == "move" and (target / "collection.anki2").exists():
+            raise ValueError("Dort liegt schon eine Sammlung. Wähle „Vorhandene öffnen“ oder einen leeren Ordner.")
+        if mode == "open" and not (target / "collection.anki2").exists():
+            raise ValueError("In diesem Ordner liegt keine Sammlung (collection.anki2).")
+        target.mkdir(parents=True, exist_ok=True)
+
+        self._col.close(downgrade=False)
+        try:
+            if mode == "move":
+                shutil.copy2(src_dir / "collection.anki2", target / "collection.anki2")
+                for name in ("collection.media", "backups"):
+                    if (src_dir / name).exists():
+                        shutil.copytree(src_dir / name, target / name, dirs_exist_ok=True)
+                if (src_dir / "collection.media.db2").exists():
+                    shutil.copy2(src_dir / "collection.media.db2", target / "collection.media.db2")
+            self._col = Collection(str(target / "collection.anki2"))
+        except Exception:
+            self._col = Collection(str(src_dir / "collection.anki2"))  # stay on the old one
+            raise
+        self._current = None
+        save_config(collection_dir=None if target.resolve() == data_dir().resolve() else str(target))
+        return f"Sammlung liegt jetzt in {target}" + (f". Die alte Kopie in {src_dir} kannst du löschen." if mode == "move" else "")
+
+    # ---------- Claude ----------
+
+    def claude_status(self) -> dict:
+        from . import claude_connect
+
+        return claude_connect.status()
+
+    def connect_claude(self, target: str) -> str:
+        """target: 'desktop' or 'code'."""
+        from . import claude_connect
+
+        return claude_connect.connect(target)
+
+    def disconnect_claude(self, target: str) -> None:
+        from . import claude_connect
+
+        claude_connect.disconnect(target)
 
     # ---------- native dialogs (app only) ----------
 
     def pick_import_file(self) -> str | None:
         import webview
 
-        res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("Anki/CSV (*.apkg;*.colpkg;*.csv;*.txt;*.tsv)",))
+        res = self._window.create_file_dialog(webview.FileDialog.OPEN, file_types=("Anki und CSV (*.apkg;*.colpkg;*.csv;*.txt;*.tsv)",))
         return res[0] if res else None
 
     def pick_export_file(self, name: str, ext: str = "apkg") -> str | None:
