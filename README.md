@@ -55,6 +55,11 @@ PyInstaller baut nur für das System, auf dem es läuft. Die Windows-Version ent
 Das Release muss ohne Anmeldung abrufbar sein, das Repo also öffentlich.
 Erste Installation bei Freunden (App ist nicht signiert): Mac – App einmal öffnen, dann *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen* (nur Apple-Silicon-Macs, der CI-Build ist arm64); Windows – „Weitere Informationen“ → *Trotzdem ausführen*. Updates danach brauchen das nicht mehr.
 
+## Website
+
+Die Download-Seite liegt komplett in `site/` (statisches HTML, kein Build) und hat mit der App nichts zu tun. `.github/workflows/pages.yml` veröffentlicht sie auf GitHub Pages, sobald sich etwas in `site/` ändert.
+Einmalig im Repo: *Settings → Pages → Source: GitHub Actions*. Die Download-Buttons zeigen immer auf das neueste Release.
+
 ## Claude anbinden (MCP)
 
 In der App: **Einstellungen → Claude verbinden → Verbinden** (für Claude Desktop und/oder Claude Code). Das war's; Claude Desktop danach einmal neu starten. Verschiebst du die App später, trägt sie den neuen Pfad beim nächsten Start selbst nach.

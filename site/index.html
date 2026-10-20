@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BetterAnki – Ankis Kern, ruhiger Kopf, Claude als Autor</title>
+<meta name="description" content="BetterAnki lernt wie Anki – gleiche Planung (FSRS), gleiche .apkg-Dateien – mit ruhigem, modernem Aussehen. Claude schreibt dir die Karten direkt in deine Sammlung. Kostenlos für macOS und Windows.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta property="og:title" content="BetterAnki">
+<meta property="og:description" content="Ankis Kern. Ruhiger Kopf. Claude als Autor. Kostenlos für macOS und Windows.">
+<style>
+@font-face{font-family:Archivo;font-style:normal;font-display:swap;font-weight:100 900;src:url(fonts/archivo-latin-wght-normal.woff2) format('woff2-variations');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:Archivo;font-style:normal;font-display:swap;font-weight:100 900;src:url(fonts/archivo-latin-ext-wght-normal.woff2) format('woff2-variations');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+
+:root{
+  --paper:#fbfaf7;--paper-2:#f3f1ec;--paper-3:#ebe8e1;--card:#fff;
+  --ink:#1c1d21;--ink-2:#5d5b55;--ink-3:#77746c;
+  --rule:#dcd9d1;--rule-2:#c6c2b9;
+  --m-red:#d93a28;--m-blue:#2f6fe0;--m-green:#1e9452;--m-ochre:#d39500;--m-violet:#7a4fd6;--m-teal:#0f8f8a;--m-pink:#d6407f;
+  --heat-1:#d3e1f8;--heat-2:#8db2ef;--heat-3:#2f6fe0;
+  --shadow:0 1px 2px rgba(28,29,33,.06),0 16px 40px -12px rgba(28,29,33,.14);
+  --ease:cubic-bezier(.16,1,.3,1);
+  --font:Archivo,system-ui,sans-serif;
+  --gutter:clamp(16px,4.4vw,64px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#17181b;--paper-2:#1f2024;--paper-3:#2a2b30;--card:#1f2024;
+    --ink:#ecebe6;--ink-2:#a9a69e;--ink-3:#8c8981;
+    --rule:#2f3035;--rule-2:#44454b;
+    --m-red:#f0624f;--m-blue:#6b9cf2;--m-green:#45c07c;--m-ochre:#f0b52a;--m-violet:#a283ec;--m-teal:#3cc1bb;--m-pink:#ee70a6;
+    --heat-1:#24344f;--heat-2:#3b5ea0;--heat-3:#6b9cf2;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 16px 40px -12px rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.5 var(--font);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+::selection{background:var(--heat-1);color:var(--ink)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:3px}
+a{color:inherit;text-underline-offset:.2em;text-decoration-thickness:1px}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{margin:0}
+kbd{font:600 .78em/1 var(--font);border:1px solid var(--rule-2);border-bottom-width:2px;border-radius:3px;padding:3px 6px;color:var(--ink-2);background:var(--paper)}
+.wrap{max-width:1312px;margin:0 auto;padding:0 var(--gutter)}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--rule)}
+.nav .wrap{display:flex;align-items:center;gap:28px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em;text-decoration:none;margin-right:auto}
+.brand img{width:28px;height:28px}
+.nav a:not(.brand){font-size:15px;color:var(--ink-2);text-decoration:none}
+.nav a:not(.brand):hover{color:var(--ink)}
+
+/* buttons */
+.btn{display:inline-flex;flex-direction:column;justify-content:center;font:600 16px/1.2 var(--font);padding:14px 22px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);text-decoration:none;cursor:pointer;transition:transform .16s var(--ease),background .16s}
+.btn small{font-weight:400;font-size:12px;opacity:.72;margin-top:3px}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:none}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule-2)}
+.btn.ghost:hover{border-color:var(--ink)}
+
+/* hero */
+.hero .top{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(40px,5vw,80px);padding-top:clamp(40px,7vh,80px);align-items:start}
+.hero h1{font-size:clamp(44px,5vw,76px);line-height:.98;letter-spacing:-.04em;font-weight:820}
+.lede{font-size:clamp(18px,1.5vw,21px);color:var(--ink-2);margin-top:28px;max-width:32ch}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:40px}
+.meta{margin-top:18px;font-size:14px;color:var(--ink-3)}
+.mobile-note{display:none;margin-top:14px;font-size:15px;color:var(--ink-2)}
+.is-mobile .mobile-note{display:block}
+
+.ask{position:relative;background:var(--card);border:1px solid var(--rule-2);border-radius:14px;padding:20px 24px;font-size:17px;max-width:540px;animation:rise .5s var(--ease) .15s both}
+.who{display:block;font-size:13px;font-weight:600;color:var(--ink-3);margin-bottom:6px}
+.wire{height:44px;margin-left:44px;border-left:1px dashed var(--rule-2);position:relative}
+.wire::after{content:"Claude legt Karten an";position:absolute;left:14px;top:12px;font-size:13px;color:var(--ink-3);animation:fade .4s var(--ease) .7s both}
+.inbox{background:var(--paper);border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.inbox header{display:flex;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--rule);font-size:14px;font-weight:650}
+.inbox header span{color:var(--m-blue)}
+.inbox header span.zero{color:var(--ink-3)}
+.row{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:16px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--rule);animation:drop .5s var(--ease) both;transition:opacity .3s var(--ease),transform .3s var(--ease)}
+.row:nth-child(2){animation-delay:1s}.row:nth-child(3){animation-delay:1.2s}.row:nth-child(4){animation-delay:1.4s}
+.row:last-child{border-bottom:0}
+.row.gone{opacity:0;transform:translateX(24px)}
+.chip{width:10px;height:10px;border-radius:3px;background:var(--m-violet)}
+.q{font-weight:600;font-size:16px}
+.a{font-size:14px;color:var(--ink-2);margin-top:2px}
+.acts{display:flex;gap:8px}
+.acts button{font:600 13px var(--font);padding:7px 12px;border-radius:8px;border:1px solid var(--rule-2);background:transparent;color:var(--ink);cursor:pointer}
+.acts button.ok{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.acts button:hover{border-color:var(--ink)}
+.empty{padding:22px 20px;font-size:15px;color:var(--ink-2)}
+.caption{font-size:13px;color:var(--ink-3);margin-top:12px}
+
+/* semester strip */
+.strip{display:flex;gap:3px;justify-content:flex-end;overflow:hidden;padding:4px 3px 12px}
+.strip i{flex:0 0 auto;width:var(--cell,9px);height:28px;border-radius:3px;background:var(--paper-3)}
+.strip i.h1{background:var(--heat-1)}.strip i.h2{background:var(--heat-2)}.strip i.h3{background:var(--heat-3)}
+.strip i.today{outline:2px solid var(--ink);outline-offset:1px;transition:background .4s var(--ease)}
+.strip i.f{background:transparent;border:1px dashed var(--rule-2)}
+.strip i.fc{background:transparent;border:1px solid var(--rule-2)}
+.strip i.exam{position:relative;overflow:visible}
+.strip i.exam::after{content:"";position:absolute;left:50%;bottom:-10px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--ink)}
+.ruler{margin-top:clamp(40px,6vh,64px)}
+.ruler .legend{display:flex;justify-content:space-between;gap:16px;font-size:13px;color:var(--ink-3);margin-top:2px}
+.legend .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink);margin:0 6px 1px 0}
+
+/* sections */
+section.band{padding:clamp(64px,10vw,136px) 0;border-top:1px solid var(--rule)}
+.band h2{font-size:clamp(32px,3.6vw,52px);letter-spacing:-.035em;line-height:1.02;font-weight:800;max-width:18ch}
+.band .intro{font-size:19px;color:var(--ink-2);margin-top:20px;max-width:56ch}
+.split{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:clamp(40px,6vw,96px);align-items:center}
+
+/* Heute mock */
+.screen{background:var(--paper);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:180px minmax(0,1fr)}
+.rail{border-right:1px solid var(--rule);padding:18px 14px;font-size:14px;background:var(--paper-2)}
+.rail b{display:block;font-size:14px;margin-bottom:14px}
+.rail span{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;color:var(--ink-2)}
+.rail span.on{background:var(--paper-3);color:var(--ink)}
+.rail hr{border:0;border-top:1px solid var(--rule);margin:12px 0}
+.rail em{font-style:normal;margin-left:auto;font-size:13px;color:var(--ink-3)}
+.work{padding:24px 28px 26px;min-width:0}
+.date{font-size:14px;color:var(--ink-2)}
+.due{font-size:clamp(64px,7vw,104px);font-weight:820;letter-spacing:-.045em;line-height:1;margin-top:6px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:14px;color:var(--ink-2);margin-top:8px}
+.work .strip{margin-top:22px;--cell:7px}
+.work .strip i{height:22px}
+table.decks{width:100%;border-collapse:collapse;margin-top:22px;font-size:14px}
+.decks td,.decks th{padding:9px 0;border-top:1px solid var(--rule);text-align:right;font-weight:600}
+.decks th{font-size:12px;color:var(--ink-3);font-weight:500;border-top:0}
+.decks td:first-child,.decks th:first-child{text-align:left;font-weight:500}
+.decks td:first-child i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:9px}
+.examline{margin-top:16px;font-size:14px;color:var(--ink-2);text-wrap:pretty}
+.examline .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink);margin:0 8px 1px 0}
+.n{color:var(--m-blue)}.l{color:var(--m-red)}.r{color:var(--m-green)}.z{color:var(--ink-3)}
+
+/* study card */
+.study{background:var(--paper-2);border-radius:14px;padding:clamp(24px,4vw,48px);outline-offset:4px}
+.card{background:var(--card);border-radius:14px 14px 0 0;box-shadow:var(--shadow);padding:40px clamp(20px,4vw,48px) 32px;text-align:center;min-height:220px}
+.card .deckname{font-size:13px;color:var(--ink-3)}
+.card .front{font-size:clamp(24px,2.6vw,34px);font-weight:750;letter-spacing:-.025em;line-height:1.15;margin-top:14px}
+.card .back{border-top:1px solid var(--rule);margin-top:26px;padding-top:22px;font-size:18px}
+.card .back[hidden]{display:none}
+.answer{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border-top:1px solid var(--rule);border-radius:0 0 14px 14px;box-shadow:var(--shadow)}
+.answer button{position:relative;font:600 15px var(--font);color:var(--ink);background:transparent;border:0;border-right:1px solid var(--rule);padding:16px 8px 18px;cursor:pointer}
+.answer button:last-child{border-right:0}
+.answer button small{display:block;font-weight:400;font-size:12px;color:var(--ink-3);margin-top:3px}
+.answer button::after{content:"";position:absolute;left:28%;right:28%;bottom:0;height:3px;border-radius:2px;background:var(--c)}
+.answer button:hover{background:var(--paper-2)}
+.answer .show{grid-column:1/-1;border:0}
+.answer .show::after{display:none}
+.study .hint{text-align:center;font-size:14px;color:var(--ink-3);margin-top:16px}
+
+/* feature ledger */
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,80px);margin-top:56px}
+.ledger h3{font-size:22px;letter-spacing:-.02em;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.ledger p.sub{font-size:15px;color:var(--ink-2);margin-top:10px}
+.ledger dl{margin:8px 0 0}
+.ledger dl div{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:20px;padding:14px 0;border-bottom:1px solid var(--rule)}
+.ledger dt{font-weight:650}
+.ledger dd{margin:0;color:var(--ink-2);font-size:16px}
+
+/* claude */
+.prompts{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:10px}
+.prompts li{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:14px 18px;font-size:16px}
+.connect{font-size:16px;margin-top:28px;color:var(--ink-2)}
+.path{display:inline;-webkit-box-decoration-break:clone;box-decoration-break:clone;font-weight:600;color:var(--ink);background:var(--paper-3);border-radius:3px;padding:2px 8px}
+
+/* install */
+.os{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,80px);margin-top:56px}
+.os > div{order:1}
+.os > div.first{order:0}
+.os h3{font-size:22px;letter-spacing:-.02em;display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.os h3 a{font-size:15px;font-weight:600}
+.os ol{list-style:none;counter-reset:s;margin:0;padding:0}
+.os li{counter-increment:s;display:grid;grid-template-columns:48px minmax(0,1fr);padding:20px 0;border-bottom:1px solid var(--rule)}
+.os li::before{content:counter(s);font-size:30px;font-weight:800;line-height:1;letter-spacing:-.03em}
+.os li b{display:block;font-size:17px}
+.os li p{color:var(--ink-2);font-size:16px;margin-top:4px}
+.os .req{font-size:14px;color:var(--ink-3);margin-top:16px}
+.why{margin-top:64px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(24px,4vw,56px)}
+.why h3{font-size:18px;letter-spacing:-.01em}
+.why p{color:var(--ink-2);font-size:16px;margin-top:8px}
+
+/* close */
+.close{text-align:center}
+.close h2{margin:0 auto;max-width:none}
+.close .cta{justify-content:center}
+footer{border-top:1px solid var(--rule);padding:32px 0 48px;font-size:14px;color:var(--ink-3)}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 32px}
+
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+@keyframes drop{from{opacity:0;transform:translateY(-14px);filter:blur(4px)}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+
+@media (max-width:980px){
+  .hero .top,.split,.ledger,.os{grid-template-columns:minmax(0,1fr)}
+  .why{grid-template-columns:minmax(0,1fr)}
+  .screen{grid-template-columns:minmax(0,1fr)}
+  .rail{display:none}
+}
+@media (max-width:640px){
+  .nav a:not(.brand):not(.dl){display:none}
+  .row{grid-template-columns:10px minmax(0,1fr)}
+  .acts{grid-column:2}
+  .ledger dl div{grid-template-columns:minmax(0,1fr);gap:2px}
+  .answer{grid-template-columns:repeat(2,1fr)}
+  .answer button:nth-child(2){border-right:0}
+  .answer button:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+  .cta .btn{flex:1 1 100%}
+  .strip i.far{display:none}
+  .ruler .legend{flex-direction:column;gap:2px}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Hauptnavigation">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="icon.svg" alt="" width="28" height="28">BetterAnki</a>
+    <a href="#funktionen">Funktionen</a>
+    <a href="#claude">Claude</a>
+    <a href="#installation">Installation</a>
+    <a href="https://github.com/ertuii/BetterAnki">GitHub</a>
+  </div>
+</nav>
+
+<main id="top">
+<header class="hero">
+  <div class="wrap top">
+    <div>
+      <h1>Ankis Kern.<br>Ruhiger Kopf.<br>Claude als Autor.</h1>
+      <p class="lede">BetterAnki lernt genau wie Anki – gleiche Planung, gleiche Stapel, gleiche Dateien. Nur ruhiger. Und Claude schreibt dir die Karten direkt in deine Sammlung.</p>
+      <div class="cta" data-downloads>
+        <a class="btn" data-os="mac" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-macOS.zip">Für macOS laden<small>Apple Silicon (M1 oder neuer)</small></a>
+        <a class="btn ghost" data-os="win" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-Windows.zip">Für Windows laden<small>Windows 10 und 11, 64-Bit</small></a>
+      </div>
+      <p class="meta">Version <span data-version>0.3.4</span> · kostenlos · Open Source (AGPL) · deine Daten bleiben auf deinem Rechner</p>
+      <p class="mobile-note">BetterAnki läuft auf Mac und Windows. Öffne diese Seite am Laptop, um es zu laden.</p>
+    </div>
+
+    <div aria-label="Beispiel: Claude legt Karten an">
+      <div class="ask"><span class="who">Du an Claude</span>Mach mir Karten aus Vorlesung 5, Zellbiologie – nur das, was in der Klausur drankommt.</div>
+      <div class="wire" aria-hidden="true"></div>
+      <div class="inbox" id="inbox">
+        <header>Eingang · von Claude <span id="inbox-count">3 neue Karten</span></header>
+        <div class="row"><i class="chip"></i><div><div class="q">Was passiert in der Prophase?</div><div class="a">Chromosomen kondensieren, der Spindelapparat bildet sich.</div></div><div class="acts"><button type="button" class="no">Verwerfen</button><button type="button" class="ok">Übernehmen</button></div></div>
+        <div class="row"><i class="chip"></i><div><div class="q">Wozu dienen Mitochondrien?</div><div class="a">ATP-Gewinnung durch Zellatmung.</div></div><div class="acts"><button type="button" class="no">Verwerfen</button><button type="button" class="ok">Übernehmen</button></div></div>
+        <div class="row"><i class="chip"></i><div><div class="q">Ribosomen übersetzen <u>mRNA</u> in Proteine.</div><div class="a">Lückentext</div></div><div class="acts"><button type="button" class="no">Verwerfen</button><button type="button" class="ok">Übernehmen</button></div></div>
+      </div>
+      <p class="caption">Beispiel. Karten von Claude warten im Eingang, bis du sie übernimmst.</p>
+    </div>
+  </div>
+
+  <div class="wrap ruler">
+    <div class="strip" data-strip data-past="150" data-future="30" data-exam="5" aria-hidden="true"></div>
+    <div class="legend"><span>Dein Semester, ein Feld pro Tag</span><span><i class="dot"></i>Klausur Zellbiologie in 5 Tagen</span></div>
+  </div>
+</header>
+
+<section class="band" id="funktionen">
+  <div class="wrap split">
+    <div>
+      <h2>Was heute dran ist, siehst du sofort.</h2>
+      <p class="intro">Beim Start steht oben, wie viele Karten fällig sind und wie lange das dauert. Darunter dein Semester als Streifen: was du gelernt hast und was kommt. Ein Klick, und du lernst.</p>
+    </div>
+    <div>
+      <div class="screen" aria-label="Beispiel: der Bildschirm Heute">
+        <div class="rail">
+          <b>BetterAnki</b>
+          <span class="on">Heute</span><span>Hinzufügen</span><span>Browser</span><span>Prüfungen</span>
+          <hr>
+          <span><i class="chip" style="background:var(--m-violet)"></i>Zellbiologie<em>58</em></span>
+          <span><i class="chip" style="background:var(--m-teal)"></i>Anatomie<em>41</em></span>
+          <span><i class="chip" style="background:var(--m-ochre)"></i>Spanisch<em>27</em></span>
+        </div>
+        <div class="work">
+          <div class="date">Dienstag, 20. Oktober</div>
+          <div class="due">126</div>
+          <div class="facts"><span>≈ 22 Min</span><span>12 Tage am Stück</span><span>91 % behalten</span></div>
+          <div class="strip" data-strip data-past="70" data-future="18" data-exam="5" aria-hidden="true"></div>
+          <table class="decks">
+            <thead><tr><th>Stapel</th><th>Neu</th><th>Lernen</th><th>Fällig</th></tr></thead>
+            <tbody>
+              <tr><td><i style="background:var(--m-violet)"></i>Zellbiologie</td><td class="n">12</td><td class="l">4</td><td class="r">42</td></tr>
+              <tr><td><i style="background:var(--m-teal)"></i>Anatomie</td><td class="n">10</td><td class="z">0</td><td class="r">31</td></tr>
+              <tr><td><i style="background:var(--m-ochre)"></i>Spanisch</td><td class="z">0</td><td class="l">2</td><td class="r">25</td></tr>
+            </tbody>
+          </table>
+          <p class="examline"><i class="dot"></i>Klausur Zellbiologie am 25. Oktober · 12 neue Karten pro Tag reichen</p>
+        </div>
+      </div>
+      <p class="caption">Nachgezeichnet mit Beispieldaten.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap split">
+    <div>
+      <h2>Beim Lernen bleibt nur die Karte.</h2>
+      <p class="intro">Alles andere tritt zurück. <kbd>Leertaste</kbd> zeigt die Antwort, <kbd>1</kbd>–<kbd>4</kbd> bewerten sie. Rückgängig, Bearbeiten, Audio und Vorlesen sind da, wenn du sie brauchst. Probier es hier aus.</p>
+    </div>
+    <div>
+      <div class="study" id="study" tabindex="0" aria-label="Probekarte, Leertaste zeigt die Antwort, 1 bis 4 bewerten">
+        <div class="card" aria-live="polite">
+          <div class="deckname" id="s-deck"></div>
+          <div class="front" id="s-front"></div>
+          <div class="back" id="s-back" hidden></div>
+        </div>
+        <div class="answer" id="s-answer"></div>
+      </div>
+      <p class="caption">Probekarten. Die Abstände rechnet in der App Ankis echte Planung (FSRS oder SM-2).</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Alles von Anki. Ein paar Dinge mehr.</h2>
+    <p class="intro">Unter der Haube läuft Ankis offizieller Kern. Deine Stapel, dein Lernstand und deine Gewohnheiten passen ohne Umbau.</p>
+    <div class="ledger">
+      <div>
+        <h3>Wie in Anki</h3>
+        <p class="sub">Gleiche Planung, gleiche Dateien, gleiche Suchsyntax.</p>
+        <dl>
+          <div><dt>Planung</dt><dd>SM-2 und FSRS samt Optimierung, alle Stapel-Optionen und Voreinstellungen.</dd></div>
+          <div><dt>Dateien</dt><dd>.apkg, .colpkg und CSV importieren und exportieren, auch per Drag &amp; Drop.</dd></div>
+          <div><dt>Browser</dt><dd>Suche mit Anki-Syntax, Aussetzen, Markieren, Verschieben.</dd></div>
+          <div><dt>Notiztypen</dt><dd>Felder, Kartenvorlagen und CSS mit Live-Vorschau, Lückentext.</dd></div>
+          <div><dt>Statistik</dt><dd>Wiederholungen, Prognose, Intervalle, Tageszeit, Antworttasten.</dd></div>
+          <div><dt>Sync</dt><dd>Optional mit AnkiWeb, dazu automatische Sicherungen.</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Nur in BetterAnki</h3>
+        <p class="sub">Prüfungen, Lernplan und Schwachstellen schaltest du in den Einstellungen einzeln ein.</p>
+        <dl>
+          <div><dt>Von Anki umziehen</dt><dd>Findet deine Anki-Profile und übernimmt sie mit Lernstand und Medien. Anki bleibt unverändert.</dd></div>
+          <div><dt>Claude als Autor</dt><dd>Claude legt Karten direkt in deiner Sammlung an. Sie warten im Eingang auf dein OK.</dd></div>
+          <div><dt>Prüfungstermine</dt><dd>Klausurdatum pro Stapel. Die App rechnet aus, wie viele neue Karten pro Tag nötig sind.</dd></div>
+          <div><dt>Lernplan</dt><dd>Dauer wählen und über alle Stapel lernen, nahe Prüfungen zuerst.</dd></div>
+          <div><dt>Schwachstellen</dt><dd>Themen unter deinem Schnitt, mit „Üben“ für die vergessenen Karten.</dd></div>
+          <div><dt>Semesterstreifen</dt><dd>Lernverlauf und Prognose auf einen Blick. Klick auf einen künftigen Tag lernt dessen Karten vor.</dd></div>
+        </dl>
+      </div>
+    </div>
+    <p class="caption" style="margin-top:28px">Noch nicht dabei: Bild-Verdeckung (Image Occlusion) und Add-ons.</p>
+  </div>
+</section>
+
+<section class="band" id="claude">
+  <div class="wrap split">
+    <div>
+      <h2>Aus der Vorlesung in den Stapel, mit einem Satz.</h2>
+      <p class="intro">BetterAnki bringt einen MCP-Server mit. Damit kann Claude Stapel anlegen, Karten schreiben, suchen und überarbeiten, direkt in deiner lokalen Sammlung.</p>
+      <p class="connect">Verbinden: <span class="path">Einstellungen → Claude verbinden → Verbinden</span>. Das klappt mit Claude Desktop und Claude Code. Claude Desktop danach einmal neu starten.</p>
+    </div>
+    <div>
+      <ul class="prompts">
+        <li>„Hier ist das Skript zu Kapitel 3. Mach Lückentexte zu allen Definitionen.“</li>
+        <li>„Welche Karten in Anatomie vergesse ich am häufigsten? Formulier sie klarer.“</li>
+        <li>„Leg einen Stapel Spanisch A2 an mit 40 Verben im Präteritum.“</li>
+        <li>„Such alle Karten zu Enzymen und markier die doppelten.“</li>
+      </ul>
+      <p class="caption">Beispielanfragen. Du brauchst ein eigenes Claude-Konto; ohne Claude funktioniert BetterAnki ganz normal.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="installation">
+  <div class="wrap">
+    <h2>In drei Schritten installiert.</h2>
+    <p class="intro">Laden, entpacken, einmal bestätigen. Updates kommen danach von selbst: Die App meldet neue Versionen und tauscht sich mit einem Klick aus. Deine Karten liegen getrennt und bleiben unberührt.</p>
+    <div class="os">
+      <div data-os-block="mac">
+        <h3>macOS <a data-os="mac" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-macOS.zip">BetterAnki-macOS.zip laden</a></h3>
+        <ol>
+          <li><div><b>Zip laden und öffnen</b><p>Der Mac entpackt die Datei von selbst. Zieh BetterAnki in den Ordner Programme.</p></div></li>
+          <li><div><b>Einmal öffnen lassen</b><p>Beim ersten Start meldet macOS, dass die App nicht geprüft werden kann. Schließ die Meldung, öffne <span class="path">Systemeinstellungen → Datenschutz &amp; Sicherheit</span> und klick unten auf <b style="display:inline">Trotzdem öffnen</b>.</p></div></li>
+          <li><div><b>Anki-Stapel mitnehmen</b><p>BetterAnki erkennt dein Anki-Profil und bietet den Umzug an, mit Lernstand und Medien.</p></div></li>
+        </ol>
+        <p class="req">Läuft auf Macs mit Apple-Chip (M1 oder neuer).</p>
+      </div>
+      <div data-os-block="win">
+        <h3>Windows <a data-os="win" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-Windows.zip">BetterAnki-Windows.zip laden</a></h3>
+        <ol>
+          <li><div><b>Zip laden und entpacken</b><p>Rechtsklick auf die Datei, „Alle extrahieren“. Leg den Ordner an einen festen Ort, zum Beispiel in deine Dokumente.</p></div></li>
+          <li><div><b>Einmal ausführen lassen</b><p>Starte BetterAnki.exe. Zeigt Windows „Der Computer wurde durch Windows geschützt“, klick auf <b style="display:inline">Weitere Informationen</b> und dann <b style="display:inline">Trotzdem ausführen</b>.</p></div></li>
+          <li><div><b>Anki-Stapel mitnehmen</b><p>BetterAnki erkennt dein Anki-Profil und bietet den Umzug an, mit Lernstand und Medien.</p></div></li>
+        </ol>
+        <p class="req">Läuft auf Windows 10 und 11 (64-Bit).</p>
+      </div>
+    </div>
+
+    <div class="why">
+      <div><h3>Warum die Warnung?</h3><p>Apple und Microsoft warnen bei jeder App, die nicht mit einem kostenpflichtigen Zertifikat signiert ist. Das sagt nichts über den Inhalt, nur dass der Herausgeber nicht bezahlt hat. Du bestätigst es genau einmal.</p></div>
+      <div><h3>Woher weiß ich, was drin ist?</h3><p>Der ganze Code ist <a href="https://github.com/ertuii/BetterAnki">offen auf GitHub</a>. Jede Version baut GitHub Actions automatisch aus genau diesem Code, nicht ein Rechner zu Hause.</p></div>
+      <div><h3>Wo liegen meine Daten?</h3><p>Nur auf deinem Rechner: unter macOS in <span class="path">~/Library/Application Support/BetterAnki</span>, unter Windows in <span class="path">%APPDATA%\BetterAnki</span>. Kein Konto, keine Cloud, außer du schaltest AnkiWeb ein.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band close">
+  <div class="wrap">
+    <h2>Dein nächstes Semester, ruhiger.</h2>
+    <div class="cta" data-downloads>
+      <a class="btn" data-os="mac" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-macOS.zip">Für macOS laden<small>Apple Silicon (M1 oder neuer)</small></a>
+      <a class="btn ghost" data-os="win" href="https://github.com/ertuii/BetterAnki/releases/latest/download/BetterAnki-Windows.zip">Für Windows laden<small>Windows 10 und 11, 64-Bit</small></a>
+    </div>
+    <p class="meta">Version <span data-version>0.3.4</span> · <a href="https://github.com/ertuii/BetterAnki/releases">alle Versionen und Änderungen</a></p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>BetterAnki ist ein unabhängiges Open-Source-Projekt (AGPL-3.0) und nutzt den offiziellen Anki-Kern. Nicht mit Anki oder AnkiWeb verbunden.</span>
+    <a href="https://github.com/ertuii/BetterAnki">Quellcode auf GitHub</a>
+  </div>
+</footer>
+
+<script>
+// OS: put the visitor's download first
+const ua = navigator.userAgentData?.platform || navigator.platform || navigator.userAgent;
+const os = /win/i.test(ua) ? 'win' : 'mac';
+if (/android|iphone|ipad|mobile/i.test(navigator.userAgent)) document.documentElement.classList.add('is-mobile');
+document.querySelectorAll('[data-downloads]').forEach(box => {
+  const [first, second] = os === 'win' ? ['win', 'mac'] : ['mac', 'win'];
+  const a = box.querySelector(`[data-os=${first}]`), b = box.querySelector(`[data-os=${second}]`);
+  a.classList.remove('ghost'); b.classList.add('ghost'); box.prepend(a);
+});
+document.querySelector(`[data-os-block=${os}]`).classList.add('first');
+
+// version from the latest release; the static number stays when offline
+fetch('https://api.github.com/repos/ertuii/BetterAnki/releases/latest')
+  .then(r => r.ok ? r.json() : null)
+  .then(r => r?.tag_name && document.querySelectorAll('[data-version]').forEach(el => el.textContent = r.tag_name.replace(/^v/, '')))
+  .catch(() => {});
+
+// semester strips: illustrative pattern, deterministic
+document.querySelectorAll('[data-strip]').forEach(el => {
+  let seed = 7, html = '';
+  const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  for (let i = 0; i < +el.dataset.past; i++) {
+    const x = rnd();
+    html += `<i class="${x < .14 ? '' : x < .45 ? 'h1' : x < .8 ? 'h2' : 'h3'}"></i>`;
+  }
+  html += '<i class="today"></i>';
+  for (let i = 0; i < +el.dataset.future; i++) html += `<i class="${rnd() < .6 ? 'fc' : 'f'}${i > 5 ? ' far' : ''}${i + 1 == el.dataset.exam ? ' exam' : ''}"></i>`;
+  el.innerHTML = html;
+});
+
+// inbox: accepting a card moves it out and fills today's cell
+const inbox = document.getElementById('inbox');
+const today = document.querySelector('.ruler .today');
+let accepted = 0;
+inbox.addEventListener('click', e => {
+  const btn = e.target.closest('.ok, .no');
+  if (!btn) return;
+  const row = btn.closest('.row');
+  row.classList.add('gone');
+  if (btn.classList.contains('ok')) today.className = 'today h' + Math.min(++accepted, 3);
+  setTimeout(() => {
+    row.remove();
+    const left = inbox.querySelectorAll('.row').length;
+    const count = document.getElementById('inbox-count');
+    count.textContent = left ? `${left} neue Karte${left > 1 ? 'n' : ''}` : '0 neue Karten';
+    count.classList.toggle('zero', !left);
+    if (!left) inbox.insertAdjacentHTML('beforeend', `<div class="empty">${accepted ? 'Erledigt. Übernommene Karten liegen jetzt in deinem Stapel Zellbiologie.' : 'Eingang leer.'}</div>`);
+  }, 300);
+});
+
+// try-out study card
+const cards = [
+  ['Zellbiologie', 'Was passiert in der Prophase?', 'Chromosomen kondensieren, der Spindelapparat bildet sich, die Kernhülle löst sich auf.'],
+  ['Spanisch', 'ich ging (ir, Präteritum)', 'fui'],
+  ['Anatomie', 'Wie viele Knochen hat ein erwachsener Mensch?', 'Etwa 206'],
+];
+const grades = [['Nochmal', '< 1 Min', '--m-red'], ['Schwer', '6 Min', '--m-ochre'], ['Gut', '1 Tag', '--m-green'], ['Einfach', '4 Tage', '--m-blue']];
+const study = document.getElementById('study'), back = document.getElementById('s-back'), answer = document.getElementById('s-answer');
+let idx = 0;
+function showCard() {
+  const [deck, front, ans] = cards[idx % cards.length];
+  document.getElementById('s-deck').textContent = deck;
+  document.getElementById('s-front').textContent = front;
+  back.textContent = ans;
+  back.hidden = true;
+  answer.innerHTML = '<button type="button" class="show">Antwort zeigen <kbd>Leertaste</kbd></button>';
+}
+function reveal() {
+  back.hidden = false;
+  answer.innerHTML = grades.map(([g, t, c], i) => `<button type="button" data-g style="--c:var(${c})"><kbd>${i + 1}</kbd> ${g}<small>${t}</small></button>`).join('');
+}
+function next() { idx++; showCard(); }
+answer.addEventListener('click', e => {
+  if (e.target.closest('.show')) reveal();
+  else if (e.target.closest('[data-g]')) next();
+});
+study.addEventListener('keydown', e => {
+  if (e.key === ' ' && back.hidden) { e.preventDefault(); reveal(); }
+  else if (/^[1-4]$/.test(e.key) && !back.hidden) next();
+});
+showCard();
+</script>
+</body>
+</html>
