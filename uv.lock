@@ -70,10 +70,11 @@ wheels = [
 
 [[package]]
 name = "betteranki"
-version = "0.2.2"
+version = "0.2.4"
 source = { editable = "." }
 dependencies = [
     { name = "anki" },
+    { name = "certifi" },
     { name = "mcp" },
     { name = "pywebview" },
 ]
@@ -86,6 +87,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anki", specifier = ">=26.9.3" },
+    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "mcp", specifier = ">=2.3.0" },
     { name = "pywebview", specifier = ">=6.2.1" },
 ]

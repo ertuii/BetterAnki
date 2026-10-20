@@ -5,11 +5,14 @@ A release (see .github/workflows/build.yml) carries BetterAnki-macOS.zip, Better
 
 import json
 import os
+import ssl
 import subprocess
 import sys
 import tempfile
 import urllib.request
 from pathlib import Path
+
+import certifi
 
 from . import __version__
 
@@ -25,7 +28,9 @@ def _parse(v: str) -> tuple:
 
 
 def _get(url: str):
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "BetterAnki"}), timeout=15)
+    # the frozen app can't find the system's root certificates, so bring certifi's
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "BetterAnki"}), timeout=15, context=ctx)
 
 
 def app_dir() -> Path:

@@ -1,6 +1,6 @@
 [project]
 name = "betteranki"
-version = "0.2.3"
+version = "0.2.4"
 description = "Moderner Anki-Klon mit MCP-Server für Claude"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -10,6 +10,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "anki>=26.9.3",
+    "certifi>=2026.10.19",
     "mcp>=2.3.0",
     "pywebview>=6.2.1",
 ]
