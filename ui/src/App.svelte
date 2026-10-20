@@ -91,7 +91,7 @@
 
 <div class="shell" class:studying={view.name === 'study'}>
   <aside>
-    <div class="brand">BetterAnki</div>
+    <div class="brand"><img src="/icon.svg" alt="" width="28" height="28" />BetterAnki</div>
     <nav>
       <button class="nav" class:on={view.name === 'today'} onclick={() => go('today')}><CalendarDays size={17} />Heute</button>
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
@@ -167,7 +167,8 @@
     display: flex; flex-direction: column; gap: 2px;
     overflow: hidden auto; transition: opacity 200ms var(--ease);
   }
-  .brand { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; padding: 0 10px 22px; }
+  .brand { font-weight: 800; font-size: 18px; letter-spacing: -0.02em; padding: 0 10px 22px 4px; display: flex; align-items: center; gap: 8px; }
+  .brand img { margin: -3px; }
   nav { display: flex; flex-direction: column; gap: 2px; }
   .nav {
     background: transparent; color: var(--ink); border: 0; font-weight: 500;

@@ -25,4 +25,5 @@ PyInstaller.__main__.run([
     "--collect-all", "anki",
     "--collect-all", "webview",
     "--osx-bundle-identifier", "app.betteranki",
+    "--icon", str(ROOT / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.icns")),
 ])
