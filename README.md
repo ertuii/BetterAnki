@@ -1,11 +1,13 @@
-# BetterAnki
+# Muisti
 
 Anki-Klon für macOS und Windows mit ruhigem, modernem UI und MCP-Server für Claude.
+
+> **Früher BetterAnki?** Muisti einmal neu laden und öffnen: Beim ersten Start zieht es Karten, Einstellungen und Sicherungen aus dem BetterAnki-Ordner um und stellt die Claude-Verbindung um. Die alte BetterAnki-App danach löschen.
 Unter der Haube läuft Ankis offizieller Kern (`anki` von PyPI): gleiche Planung (SM-2/FSRS), gleiche Dateiformate (.apkg), gleiche Suchsyntax.
 
 Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen → Speicherort*):
-- macOS: `~/Library/Application Support/BetterAnki/`
-- Windows: `%APPDATA%\BetterAnki\`
+- macOS: `~/Library/Application Support/Muisti/`
+- Windows: `%APPDATA%\Muisti\`
 
 ## Funktionen
 
@@ -35,21 +37,21 @@ Noch nicht: Bild-Verdeckung (Image Occlusion), Add-ons.
 ```sh
 brew install uv            # einmalig (Windows: winget install astral-sh.uv)
 cd ui && npm install && npm run build && cd ..
-uv run betteranki
+uv run muisti
 ```
 
 ## App bauen
 
 ```sh
-uv run python build.py     # -> dist/BetterAnki.app (Mac) bzw. dist/BetterAnki/BetterAnki.exe (Windows)
+uv run python build.py     # -> dist/Muisti.app (Mac) bzw. dist/Muisti/Muisti.exe (Windows)
 ```
 PyInstaller baut nur für das System, auf dem es läuft. Die Windows-Version entsteht auf einem Windows-PC oder über GitHub Actions (`.github/workflows/build.yml`).
 
 ## Updates ausrollen
 
-1. Version in `src/betteranki/__init__.py` und `pyproject.toml` erhöhen (z. B. `0.3.0`), committen.
+1. Version in `src/muisti/__init__.py` und `pyproject.toml` erhöhen (z. B. `0.3.0`), committen.
 2. `git tag v0.3.0 && git push --tags`
-3. GitHub Actions baut Mac und Windows und veröffentlicht ein Release mit `BetterAnki-macOS.zip` und `BetterAnki-Windows.zip`.
+3. GitHub Actions baut Mac und Windows und veröffentlicht ein Release mit `Muisti-macOS.zip` und `Muisti-Windows.zip`.
 4. Installierte Apps sehen beim Start „Version 0.3.0 ist da“, ein Klick lädt, ersetzt und startet die App neu. Karten liegen getrennt und bleiben unberührt.
 
 Das Release muss ohne Anmeldung abrufbar sein, das Repo also öffentlich.

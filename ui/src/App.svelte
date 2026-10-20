@@ -104,7 +104,7 @@
 {#if mac}<div class="titlebar pywebview-drag-region" aria-hidden="true"></div>{/if}
 <div class="shell" class:mac class:studying={view.name === 'study'}>
   <aside>
-    <div class="brand"><img src="/icon.svg" alt="" width="28" height="28" />BetterAnki</div>
+    <div class="brand"><img src="/icon.svg" alt="" width="28" height="28" />Muisti</div>
     <nav>
       <button class="nav" class:on={view.name === 'today'} onclick={() => go('today')}><CalendarDays size={17} />Heute</button>
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>

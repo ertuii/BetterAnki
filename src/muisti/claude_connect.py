@@ -1,4 +1,4 @@
-"""One-click registration of the BetterAnki MCP server in Claude Desktop and Claude Code."""
+"""One-click registration of the Muisti MCP server in Claude Desktop and Claude Code."""
 
 import json
 import os
@@ -7,14 +7,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-NAME = "betteranki"
+NAME = "muisti"
+LEGACY = "betteranki"  # ponytail: registered under this name before 0.4.0; drop with the data folder move
 
 
 def server_command() -> dict:
     """Absolute paths only: Claude Desktop starts servers without the user's shell PATH."""
     if getattr(sys, "frozen", False):
         return {"command": sys.executable, "args": ["--mcp"]}
-    return {"command": sys.executable, "args": ["-m", "betteranki", "--mcp"]}  # the project's venv python
+    return {"command": sys.executable, "args": ["-m", "muisti", "--mcp"]}  # the project's venv python
 
 
 # ---------- Claude Desktop: edit its JSON config ----------
@@ -41,7 +42,7 @@ def _connect_desktop() -> str:
         shutil.copy2(f, f.with_name(f.name + ".bak"))
     cfg.setdefault("mcpServers", {})[NAME] = server_command()
     f.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
-    return "Mit Claude Desktop verbunden. Starte Claude Desktop neu, damit es BetterAnki findet."
+    return "Mit Claude Desktop verbunden. Starte Claude Desktop neu, damit es Muisti findet."
 
 
 def _disconnect_desktop():
@@ -62,10 +63,10 @@ def _claude_cli() -> str | None:
     return next((str(c) for c in candidates if c and Path(c).exists()), None)
 
 
-def _code_entry() -> dict | None:
+def _code_entry(name: str = NAME) -> dict | None:
     f = Path.home() / ".claude.json"
     try:
-        return json.loads(f.read_text(encoding="utf-8")).get("mcpServers", {}).get(NAME)
+        return json.loads(f.read_text(encoding="utf-8")).get("mcpServers", {}).get(name)
     except (OSError, ValueError):
         return None
 
@@ -83,7 +84,7 @@ def _connect_code() -> str:
     if _code_entry():
         _run(cli, "mcp", "remove", "-s", "user", NAME)
     _run(cli, "mcp", "add-json", "-s", "user", NAME, json.dumps({"type": "stdio", **server_command()}))
-    return "Mit Claude Code verbunden. In neuen Claude-Code-Sitzungen ist BetterAnki verfügbar."
+    return "Mit Claude Code verbunden. In neuen Claude-Code-Sitzungen ist Muisti verfügbar."
 
 
 def _disconnect_code():
@@ -123,12 +124,25 @@ def disconnect(target: str) -> None:
     {"desktop": _disconnect_desktop, "code": _disconnect_code}[target]()
 
 
+def _migrate_legacy() -> None:
+    """Swap entries registered as BetterAnki for Muisti's."""
+    cfg = _read_desktop()
+    if cfg.get("mcpServers", {}).pop(LEGACY, None) is not None:
+        _desktop_config().write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding="utf-8")
+        _connect_desktop()
+    cli = _claude_cli()
+    if cli and _code_entry(LEGACY):
+        _run(cli, "mcp", "remove", "-s", "user", LEGACY)
+        _connect_code()
+
+
 def refresh_paths() -> None:
-    """On app start: if BetterAnki is registered but the app moved, point the entries at the new location."""
+    """On app start: if Muisti is registered but the app moved, point the entries at the new location."""
     try:
         # only the installed app may claim the entries; a dev run must not repoint them to the project's venv
         if not getattr(sys, "frozen", False) or status()["unstable_location"]:
             return
+        _migrate_legacy()
         if _state(_read_desktop().get("mcpServers", {}).get(NAME)) == "outdated":
             _connect_desktop()
         if _state(_code_entry()) == "outdated":

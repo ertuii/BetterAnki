@@ -41,7 +41,7 @@ def _bind(window):
 def run():
     core = Core()
     url = server.start(core) + ("?mac" if sys.platform == "darwin" else "")  # the UI leaves room for the window buttons
-    core._window = webview.create_window("BetterAnki", url, js_api=core, width=1200, height=820, min_size=(720, 540))
+    core._window = webview.create_window("Muisti", url, js_api=core, width=1200, height=820, min_size=(720, 540))
     try:
         webview.start(_bind, (core._window,))
     finally:

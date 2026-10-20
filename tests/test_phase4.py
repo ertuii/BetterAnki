@@ -4,11 +4,11 @@ from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp())
 os.environ["HOME"] = os.environ["USERPROFILE"] = os.environ["APPDATA"] = str(HOME)  # fake Anki desktop profile lives here
-os.environ["BETTERANKI_DIR"] = str(HOME / "data")
+os.environ["MUISTI_DIR"] = str(HOME / "data")
 
 from anki.collection import Collection
 
-from betteranki.core import Core, collection_path
+from muisti.core import Core, collection_path
 
 
 def _fake_anki_profile() -> Path:

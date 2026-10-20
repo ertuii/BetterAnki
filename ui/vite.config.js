@@ -3,5 +3,5 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [svelte()],
-  build: { outDir: '../src/betteranki/web', emptyOutDir: true },
+  build: { outDir: '../src/muisti/web', emptyOutDir: true },
 })

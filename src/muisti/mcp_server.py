@@ -10,7 +10,7 @@ from mcp.server import MCPServer
 from .core import Core
 from .server import INFO_FILE
 
-mcp = MCPServer("BetterAnki")
+mcp = MCPServer("Muisti")
 _open_lock = threading.Lock()  # tool calls run in parallel threads; the collection opens once at a time
 
 

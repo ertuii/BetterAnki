@@ -5,7 +5,7 @@ primary_target: "ui/src/App.svelte"
 related_targets: []
 ---
 
-Scope: the whole BetterAnki app shell (Heute/Decks, Lernen, Hinzufügen/Editor, Browser). Mode: Operate.
+Scope: the whole Muisti app shell (Heute/Decks, Lernen, Hinzufügen/Editor, Browser). Mode: Operate.
 Audience: the owner, a university student reviewing daily on a laptop, day and evening; theme follows OS.
 Task: see what is due today, study it by keyboard, add/edit cards, find cards. Claude adds cards via MCP; they appear here.
 

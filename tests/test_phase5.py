@@ -6,9 +6,9 @@ import tempfile
 from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp())
-os.environ["BETTERANKI_DIR"] = str(HOME / "data")
+os.environ["MUISTI_DIR"] = str(HOME / "data")
 
-from betteranki.core import Core, collection_path  # noqa: E402
+from muisti.core import Core, collection_path  # noqa: E402
 
 core = Core(collection_path())
 col = core._col
@@ -91,7 +91,7 @@ assert core.undo() and col.find_cards('"deck:Bio" -is:new')
 # local server: requests with a foreign Host header (DNS rebinding) are refused
 import http.client  # noqa: E402
 
-from betteranki import server  # noqa: E402
+from muisti import server  # noqa: E402
 
 port = int(server.start(core).rsplit(":", 1)[1].strip("/"))
 for host, refused in ((f"127.0.0.1:{port}", False), (f"localhost:{port}", False), (f"evil.example:{port}", True)):

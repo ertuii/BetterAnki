@@ -69,33 +69,6 @@ wheels = [
 ]
 
 [[package]]
-name = "betteranki"
-version = "0.3.4"
-source = { editable = "." }
-dependencies = [
-    { name = "anki" },
-    { name = "certifi" },
-    { name = "mcp" },
-    { name = "pywebview" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pyinstaller" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anki", specifier = ">=26.9.3" },
-    { name = "certifi", specifier = ">=2026.10.19" },
-    { name = "mcp", specifier = ">=2.3.0" },
-    { name = "pywebview", specifier = ">=6.2.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pyinstaller", specifier = ">=6.22.3" }]
-
-[[package]]
 name = "bottle"
 version = "0.13.4"
 source = { registry = "https://pypi.org/simple" }
@@ -573,6 +546,33 @@ sdist = { url = "https://files.pythonhosted.org/packages/9e/2d/7c251e34207f6c510
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/48/32583066b155bb5d4507e7887dc88ee23118cc4de8e2a12870c49719e2a8/mcp_types-2.3.0-py3-none-any.whl", hash = "sha256:968efdbdaedfab06adae40d378a34395f1090c5921d4be3c9cde283aaf76d91d", size = 69108, upload-time = "2026-10-02T22:06:54.099Z" },
 ]
+
+[[package]]
+name = "muisti"
+version = "0.4.0"
+source = { editable = "." }
+dependencies = [
+    { name = "anki" },
+    { name = "certifi" },
+    { name = "mcp" },
+    { name = "pywebview" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pyinstaller" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anki", specifier = ">=26.9.3" },
+    { name = "certifi", specifier = ">=2026.10.19" },
+    { name = "mcp", specifier = ">=2.3.0" },
+    { name = "pywebview", specifier = ">=6.2.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pyinstaller", specifier = ">=6.22.3" }]
 
 [[package]]
 name = "opentelemetry-api"

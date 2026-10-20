@@ -9,12 +9,12 @@ import threading
 import zipfile
 from pathlib import Path
 
-os.environ["BETTERANKI_DIR"] = tempfile.mkdtemp()  # the swap helper reports failures into the data folder
+os.environ["MUISTI_DIR"] = tempfile.mkdtemp()  # the swap helper reports failures into the data folder
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
-from betteranki import updater  # noqa: E402
+from muisti import updater  # noqa: E402
 
 tmp = Path(tempfile.mkdtemp())
-app_name = "BetterAnki" if sys.platform == "win32" else "BetterAnki.app"
+app_name = "Muisti" if sys.platform == "win32" else "Muisti.app"
 (tmp / "Applications" / app_name).mkdir(parents=True)
 with zipfile.ZipFile(tmp / updater.ASSET, "w") as z:
     z.writestr(f"{app_name}/new.txt", "v9")
@@ -41,7 +41,7 @@ releases["assets"][updater.ASSET] = f"{base}/{updater.ASSET}"
 assert updater._parse("v0.10.0") > updater._parse("0.9.3")
 assert updater.check() is None  # running from source, no override: never updates
 
-os.environ["BETTERANKI_UPDATE_URL"] = f"{base}/latest"
+os.environ["MUISTI_UPDATE_URL"] = f"{base}/latest"
 u = updater.check()
 assert u and u["version"] == "9.0.0", u
 
@@ -55,9 +55,9 @@ updater._start_swap = lambda target, new, staging: swapped.update(target=target,
 updater.install(u)
 assert swapped["target"] == tmp / "Applications" / app_name
 assert (swapped["new"] / "new.txt").read_text() == "v9"
-assert swapped["new"].parent == tmp / "Applications" / ".BetterAnki-update"
+assert swapped["new"].parent == tmp / "Applications" / ".Muisti-update"
 
-os.environ["BETTERANKI_UPDATE_URL"] = "http://127.0.0.1:1/latest"  # offline
+os.environ["MUISTI_UPDATE_URL"] = "http://127.0.0.1:1/latest"  # offline
 assert updater.check() is None
 try:
     updater.check(manual=True)
@@ -76,15 +76,15 @@ if sys.platform == "win32":
     import importlib
 
     importlib.reload(updater)  # undo the stubs above
-    app = tmp / "Programs" / "BetterAnki"
+    app = tmp / "Programs" / "Muisti"
     app.mkdir(parents=True)
     (app / "old.txt").write_text("v1")
-    staging = app.parent / ".BetterAnki-update"
-    (staging / "BetterAnki").mkdir(parents=True)
-    (staging / "BetterAnki" / "new.txt").write_text("v2")
+    staging = app.parent / ".Muisti-update"
+    (staging / "Muisti").mkdir(parents=True)
+    (staging / "Muisti" / "new.txt").write_text("v2")
     fake_app = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(2)"])
     os.chdir(app)
-    updater._start_swap(app, staging / "BetterAnki", staging, pid=fake_app.pid)
+    updater._start_swap(app, staging / "Muisti", staging, pid=fake_app.pid)
     os.chdir(tmp)
     fake_app.wait()
     for _ in range(60):

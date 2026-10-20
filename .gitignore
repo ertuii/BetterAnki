@@ -1,7 +1,7 @@
 .venv/
 __pycache__/
 ui/node_modules/
-src/betteranki/web/
+src/muisti/web/
 build/
 dist/
 *.spec

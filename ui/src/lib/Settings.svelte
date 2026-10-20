@@ -200,7 +200,7 @@
   }
 
   async function exportAll() {
-    const path = await api.pick_export_file('BetterAnki-Sammlung', 'colpkg')
+    const path = await api.pick_export_file('Muisti-Sammlung', 'colpkg')
     if (!path) return
     try {
       await api.export_collection(path, true)
@@ -267,7 +267,7 @@
 
   <section>
     <h2>Von Anki übernehmen</h2>
-    <p class="muted">Bringt deine Anki-Sammlung mit Lernstand in BetterAnki. Anki vorher schließen.</p>
+    <p class="muted">Bringt deine Anki-Sammlung mit Lernstand in Muisti. Anki vorher schließen.</p>
     <AnkiMigration {notify} hasCards={cardCount > 0} onDone={async () => { await refresh(); await load() }} />
   </section>
 
@@ -342,7 +342,7 @@
 
   <section>
     <h2>Sicherungen</h2>
-    <p class="muted">Beim Beenden sichert BetterAnki automatisch. Vor jedem Wiederherstellen und jeder Übernahme wird der aktuelle Stand zusätzlich gesichert.</p>
+    <p class="muted">Beim Beenden sichert Muisti automatisch. Vor jedem Wiederherstellen und jeder Übernahme wird der aktuelle Stand zusätzlich gesichert.</p>
     {#if prefs}
       <div class="fields" oninput={savePrefs} onchange={savePrefs}>
         <label>Höchstens alle (Minuten)<input type="number" min="5" bind:value={prefs.backups.minimum_interval_mins} /></label>
@@ -377,7 +377,7 @@
     <h2>Claude verbinden</h2>
     <p class="muted">Ein Klick, und Claude kann deine Karten anlegen, durchsuchen und bearbeiten. Frag danach einfach: „Erstelle 10 Karten zu Integralrechnung im Stapel Analysis II.“</p>
     {#if claude?.unstable_location}
-      <p class="choice">Verschiebe BetterAnki zuerst in den Ordner <b>Programme</b> und öffne es von dort. Sonst zeigt Claude ins Leere, sobald die App verschoben wird.</p>
+      <p class="choice">Verschiebe Muisti zuerst in den Ordner <b>Programme</b> und öffne es von dort. Sonst zeigt Claude ins Leere, sobald die App verschoben wird.</p>
     {/if}
     {#if claude}
       <ul class="clients">
@@ -425,7 +425,7 @@
           <b>{moveTarget.folder}</b>
           {#if moveTarget.synced_folder}<p>Achtung: Dieser Ordner wird von einem Cloud-Dienst synchronisiert, das kann die Datenbank beschädigen.</p>{/if}
           {#if moveTarget.has_collection}
-            <p>Dort liegt bereits eine Sammlung. BetterAnki kann sie öffnen; deine aktuelle Sammlung bleibt unverändert am alten Ort.</p>
+            <p>Dort liegt bereits eine Sammlung. Muisti kann sie öffnen; deine aktuelle Sammlung bleibt unverändert am alten Ort.</p>
             <div class="row">
               <button disabled={moving} onclick={() => applyStorage('open')}>Vorhandene Sammlung öffnen</button>
               <button class="ghost" onclick={() => (moveTarget = null)}>Abbrechen</button>
@@ -445,7 +445,7 @@
   <section>
     <h2>Version</h2>
     <div class="row">
-      <span class="num">BetterAnki {version}</span>
+      <span class="num">Muisti {version}</span>
       <button class="ghost sm" disabled={checking} onclick={lookForUpdate}>{checking ? 'Suche …' : 'Nach Updates suchen'}</button>
     </div>
     <p class="muted small">Die App sucht beim Start selbst nach neuen Versionen. Deine Karten bleiben beim Update unberührt.</p>

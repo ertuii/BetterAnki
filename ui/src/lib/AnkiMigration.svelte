@@ -1,7 +1,7 @@
 <script>
   import { api } from './api.js'
 
-  // Finds Anki desktop profiles on this computer and copies or merges one into BetterAnki.
+  // Finds Anki desktop profiles on this computer and copies or merges one into Muisti.
   let { notify, onDone, hasCards = false, compact = false } = $props()
 
   let profiles = $state(null)

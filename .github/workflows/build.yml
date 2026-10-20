@@ -1,5 +1,5 @@
 name: build
-# Every push builds and tests. Pushing a tag v<version> (matching betteranki.__version__) also publishes a
+# Every push builds and tests. Pushing a tag v<version> (matching muisti.__version__) also publishes a
 # GitHub Release; the installed apps find it and update themselves.
 on: [workflow_dispatch, push]
 jobs:
@@ -7,8 +7,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-latest, zip: BetterAnki-macOS.zip }
-          - { os: windows-latest, zip: BetterAnki-Windows.zip }
+          - { os: macos-latest, zip: Muisti-macOS.zip }
+          - { os: windows-latest, zip: Muisti-Windows.zip }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +17,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - if: startsWith(github.ref, 'refs/tags/v')
-        run: uv run python -c "import betteranki, sys; sys.exit(0 if 'v' + betteranki.__version__ == '${{ github.ref_name }}' else 'Tag passt nicht zu __version__')"
+        run: uv run python -c "import muisti, sys; sys.exit(0 if 'v' + muisti.__version__ == '${{ github.ref_name }}' else 'Tag passt nicht zu __version__')"
       - run: uv run python tests/test_core.py
       - run: uv run python tests/test_phase2.py
       - run: uv run python tests/test_phase3.py
@@ -28,12 +28,12 @@ jobs:
         working-directory: ui
       - run: uv run python build.py
       - if: runner.os == 'macOS'
-        run: dist/BetterAnki.app/Contents/MacOS/BetterAnki --selfcheck "$RUNNER_TEMP/selfcheck.txt" || { cat "$RUNNER_TEMP/selfcheck.txt"; exit 1; }
+        run: dist/Muisti.app/Contents/MacOS/Muisti --selfcheck "$RUNNER_TEMP/selfcheck.txt" || { cat "$RUNNER_TEMP/selfcheck.txt"; exit 1; }
       - if: runner.os == 'Windows'
         name: Smoke test, also as if unzipped with Windows' own tool (every file marked as downloaded)
         shell: pwsh
         run: |
-          $app = (Resolve-Path dist/BetterAnki/BetterAnki.exe).Path
+          $app = (Resolve-Path dist/Muisti/Muisti.exe).Path
           $log = "$env:RUNNER_TEMP\selfcheck.txt"
           function Check($label) {
             Remove-Item $log -ErrorAction SilentlyContinue
@@ -46,20 +46,20 @@ jobs:
             if (Test-Path $log) { Get-Content $log | Write-Host }
             return $p.ExitCode
           }
-          $files = Get-ChildItem dist/BetterAnki -Recurse -File
+          $files = Get-ChildItem dist/Muisti -Recurse -File
           if ((Check "plain") -ne 0) { exit 1 }
           $files | ForEach-Object { Set-Content -LiteralPath $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
           if ((Check "marked") -ne 0) { exit 1 }
           # without the config the marked build has to fail, or this test proves nothing
-          Rename-Item dist/BetterAnki/BetterAnki.exe.config cfg.bak
-          $without = Check "marked, without BetterAnki.exe.config"
-          Rename-Item dist/BetterAnki/cfg.bak BetterAnki.exe.config
+          Rename-Item dist/Muisti/Muisti.exe.config cfg.bak
+          $without = Check "marked, without Muisti.exe.config"
+          Rename-Item dist/Muisti/cfg.bak Muisti.exe.config
           $files | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue }
           if ($without -eq 0) { Write-Host "::warning::Mark of the Web did not reproduce on this runner" }
       - if: runner.os == 'macOS'
-        run: ditto -c -k --keepParent dist/BetterAnki.app ${{ matrix.zip }}
+        run: ditto -c -k --keepParent dist/Muisti.app ${{ matrix.zip }}
       - if: runner.os == 'Windows'
-        run: Compress-Archive -Path dist/BetterAnki -DestinationPath ${{ matrix.zip }}
+        run: Compress-Archive -Path dist/Muisti -DestinationPath ${{ matrix.zip }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.zip }}
@@ -78,7 +78,7 @@ jobs:
         run: |
           base="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}"
           tag="${{ github.ref_name }}"
-          echo "{\"version\": \"${tag#v}\", \"assets\": {\"BetterAnki-macOS.zip\": \"$base/BetterAnki-macOS.zip\", \"BetterAnki-Windows.zip\": \"$base/BetterAnki-Windows.zip\"}}" > latest.json
+          echo "{\"version\": \"${tag#v}\", \"assets\": {\"Muisti-macOS.zip\": \"$base/Muisti-macOS.zip\", \"Muisti-Windows.zip\": \"$base/Muisti-Windows.zip\"}}" > latest.json
           python3 -m json.tool latest.json
-      - run: gh release create "${{ github.ref_name }}" BetterAnki-macOS.zip BetterAnki-Windows.zip latest.json --repo "${{ github.repository }}" --generate-notes
+      - run: gh release create "${{ github.ref_name }}" Muisti-macOS.zip Muisti-Windows.zip latest.json --repo "${{ github.repository }}" --generate-notes
         env: { GH_TOKEN: "${{ github.token }}" }

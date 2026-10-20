@@ -4,12 +4,12 @@ import tempfile
 from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp())
-os.environ["BETTERANKI_DIR"] = str(HOME / "data")
+os.environ["MUISTI_DIR"] = str(HOME / "data")
 # Claude Desktop/Code configs are looked up here, never the real ones (Windows: USERPROFILE, APPDATA)
 os.environ["HOME"] = os.environ["USERPROFILE"] = os.environ["APPDATA"] = str(HOME)
 
-from betteranki import claude_connect
-from betteranki.core import Core, collection_path, data_dir
+from muisti import claude_connect
+from muisti.core import Core, collection_path, data_dir
 
 
 def test_storage_import_claude():
@@ -43,10 +43,15 @@ def test_storage_import_claude():
     desktop.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}, "preferences": {"a": 1}}))
     claude_connect.connect("desktop")
     cfg = json.loads(desktop.read_text())
-    assert set(cfg["mcpServers"]) == {"other", "betteranki"} and cfg["preferences"] == {"a": 1}
+    assert set(cfg["mcpServers"]) == {"other", "muisti"} and cfg["preferences"] == {"a": 1}
     assert claude_connect.status()["desktop"]["state"] == "on"
     claude_connect.disconnect("desktop")
     assert set(json.loads(desktop.read_text())["mcpServers"]) == {"other"}
+
+    # registered as BetterAnki before the rename: replaced by Muisti's entry
+    desktop.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}, "betteranki": {"command": "old"}}}))
+    claude_connect._migrate_legacy()
+    assert set(json.loads(desktop.read_text())["mcpServers"]) == {"other", "muisti"}
     core._close()
 
 

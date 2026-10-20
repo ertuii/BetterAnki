@@ -1,7 +1,8 @@
+import os
 import tempfile
 from pathlib import Path
 
-from betteranki.core import Core
+from muisti.core import Core, data_dir
 
 
 def test_roundtrip():
@@ -31,6 +32,27 @@ def test_roundtrip():
     core._close()
 
 
+def test_data_dir_moves_betteranki_folder():
+    tmp = Path(tempfile.mkdtemp())
+    saved = dict(os.environ)
+    os.environ.pop("MUISTI_DIR", None)
+    os.environ["HOME"] = os.environ["USERPROFILE"] = os.environ["APPDATA"] = str(tmp)
+    try:
+        base = data_dir().parent
+        (base / "Muisti").rmdir()  # first start after the rename: only the old folder exists
+        (base / "BetterAnki").mkdir()
+        (base / "BetterAnki" / "collection.anki2").write_text("x")
+        d = data_dir()
+        assert d.name == "Muisti" and (d / "collection.anki2").read_text() == "x"
+        assert not (base / "BetterAnki").exists()
+        (base / "BetterAnki").mkdir()  # both exist: leave the old one alone
+        assert data_dir() == d and (base / "BetterAnki").exists()
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 if __name__ == "__main__":
     test_roundtrip()
+    test_data_dir_moves_betteranki_folder()
     print("ok")

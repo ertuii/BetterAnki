@@ -1,6 +1,6 @@
 """In-app updates from GitHub Releases: check, download, swap the app after it quits, restart.
 
-A release (see .github/workflows/build.yml) carries BetterAnki-macOS.zip, BetterAnki-Windows.zip and latest.json.
+A release (see .github/workflows/build.yml) carries Muisti-macOS.zip, Muisti-Windows.zip and latest.json.
 """
 
 import json
@@ -16,8 +16,8 @@ import certifi
 
 from . import __version__
 
-REPO = "ertuii/BetterAnki"
-ASSET = "BetterAnki-Windows.zip" if sys.platform == "win32" else "BetterAnki-macOS.zip"
+REPO = "ertuii/Muisti"
+ASSET = "Muisti-Windows.zip" if sys.platform == "win32" else "Muisti-macOS.zip"
 
 
 def _parse(v: str) -> tuple:
@@ -30,18 +30,18 @@ def _parse(v: str) -> tuple:
 def _get(url: str):
     # the frozen app can't find the system's root certificates, so bring certifi's
     ctx = ssl.create_default_context(cafile=certifi.where())
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "BetterAnki"}), timeout=15, context=ctx)
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Muisti"}), timeout=15, context=ctx)
 
 
 def app_dir() -> Path:
-    """What gets replaced: BetterAnki.app on macOS, the BetterAnki folder next to BetterAnki.exe on Windows."""
+    """What gets replaced: Muisti.app on macOS, the Muisti folder next to Muisti.exe on Windows."""
     exe = Path(sys.executable)
     return exe.parent if sys.platform == "win32" else exe.parents[2]
 
 
 def check(manual: bool = False) -> dict | None:
     """The newer release, or None if up to date or running from source. Offline: None, or an error if manual."""
-    url = os.environ.get("BETTERANKI_UPDATE_URL")  # for testing against a local fake release
+    url = os.environ.get("MUISTI_UPDATE_URL")  # for testing against a local fake release
     if not url and not getattr(sys, "frozen", False):
         return None
     try:
@@ -62,7 +62,7 @@ def install(update: dict) -> None:
     target = app_dir()
     if not os.access(target.parent, os.W_OK):
         raise RuntimeError(f"Keine Schreibrechte für {target.parent}. Lade die neue Version bitte manuell herunter.")
-    staging = target.parent / ".BetterAnki-update"  # same volume, so the swap is a rename
+    staging = target.parent / ".Muisti-update"  # same volume, so the swap is a rename
     _rmtree(staging)
     staging.mkdir()
     zip_path = staging / ASSET
@@ -112,11 +112,11 @@ def _start_swap(target: Path, new: Path, staging: Path, pid: int | None = None):
     script = tmp / ("swap.ps1" if sys.platform == "win32" else "swap.sh")
     if sys.platform == "win32":
         target, new, old, staging, failed = (str(p).replace("'", "''") for p in (target, new, old, staging, failed))  # PowerShell quoting
-        # ponytail: also stops BetterAnki processes started by Claude (--mcp), Windows can't replace files in use;
+        # ponytail: also stops Muisti processes started by Claude (--mcp), Windows can't replace files in use;
         # Claude reconnects on its next start
         script.write_text(f"""
 Wait-Process -Id {pid} -ErrorAction SilentlyContinue
-Get-Process BetterAnki -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{target}\\*' }} | Stop-Process -Force
+Get-Process Muisti -ErrorAction SilentlyContinue | Where-Object {{ $_.Path -like '{target}\\*' }} | Stop-Process -Force
 Remove-Item -LiteralPath '{old}' -Recurse -Force -ErrorAction SilentlyContinue
 # virus scanners and WebView2 may hold files for a moment after the app quit
 $moved = $false
@@ -136,7 +136,7 @@ if ($moved) {{
 }}
 if (-not $moved) {{ Set-Content -LiteralPath '{failed}' -Value "$err" -Encoding UTF8 }}
 Remove-Item -LiteralPath '{staging}' -Recurse -Force -ErrorAction SilentlyContinue
-Start-Process -FilePath '{target}\\BetterAnki.exe'
+Start-Process -FilePath '{target}\\Muisti.exe'
 """, encoding="utf-8")
         flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
         # cwd: started by double-click the app's working directory is its own folder, and Windows won't rename

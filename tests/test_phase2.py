@@ -2,9 +2,9 @@ import os
 import tempfile
 from pathlib import Path
 
-os.environ["BETTERANKI_DIR"] = tempfile.mkdtemp()  # backups and sync.json go here, not into the real profile
+os.environ["MUISTI_DIR"] = tempfile.mkdtemp()  # backups and sync.json go here, not into the real profile
 
-from betteranki.core import Core, data_dir
+from muisti.core import Core, data_dir
 
 
 def test_phase2():

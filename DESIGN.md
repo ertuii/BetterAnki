@@ -1,5 +1,5 @@
 ---
-name: BetterAnki
+name: Muisti
 colors:
   paper: "#fbfaf7"
   paper-2: "#f3f1ec"
@@ -30,7 +30,7 @@ components:
   button-ghost: { backgroundColor: "transparent", textColor: "{colors.ink}", rounded: "{rounded.control}", padding: "9px 14px" }
 ---
 
-# Design System: BetterAnki
+# Design System: Muisti
 
 ## Overview
 The semester wall planner. The app is ink on paper with planner hairlines; the only colour is data, drawn like marker on a printed planner. Calm, dense, keyboard-first. Light and dark follow the OS (dark = graphite paper `#17181b`, markers brightened).

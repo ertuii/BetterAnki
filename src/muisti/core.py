@@ -26,15 +26,18 @@ set_lang("de_DE")  # interval labels, undo names, import messages in German
 
 
 def data_dir() -> Path:
-    if os.environ.get("BETTERANKI_DIR"):  # separate profile, e.g. for testing
-        base = Path(os.environ["BETTERANKI_DIR"])
+    if os.environ.get("MUISTI_DIR"):  # separate profile, e.g. for testing
+        base = Path(os.environ["MUISTI_DIR"])
     elif sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
     elif sys.platform == "win32":
         base = Path(os.environ["APPDATA"])
     else:
         base = Path.home() / ".local" / "share"
-    d = base if os.environ.get("BETTERANKI_DIR") else base / "BetterAnki"
+    d = base if os.environ.get("MUISTI_DIR") else base / "Muisti"
+    legacy = base / "BetterAnki"  # ponytail: the app's name before 0.4.0; drop this move a few versions later
+    if not os.environ.get("MUISTI_DIR") and not d.exists() and legacy.is_dir():
+        legacy.rename(d)
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -610,6 +613,7 @@ class Core:
             self._col.decks.remove([deck_id])
 
     # ---------- optional features (stored in the collection, so they travel with backups and sync) ----------
+    # keys keep the old "betteranki." prefix: renaming them would drop settings and exam dates from existing collections
 
     _FEATURES = {"exams": False, "plan": False, "weak": False, "inbox": True}
 

@@ -28,7 +28,7 @@ Daily review sessions on a laptop, both during the day (library/university) and 
 - Card content is user/Claude-authored HTML with its own CSS; rendered isolated from the app chrome.
 
 ## Brand Commitments
-Name: BetterAnki. Priorities the user stated: calmer, modern UI without legacy clutter; better overview of progress and what is due.
+Name: Muisti. Priorities the user stated: calmer, modern UI without legacy clutter; better overview of progress and what is due.
 
 ## Evidence on Hand
 No logo, screenshots, or user data yet. Do not invent usage stats or testimonials.
