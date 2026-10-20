@@ -12,4 +12,7 @@ def run():
         webview.start()
     finally:
         server.stop()
-        core._close()
+        try:
+            core.backup(force=False)  # Anki's periodic backup: skipped if the last one is recent
+        finally:
+            core._close()

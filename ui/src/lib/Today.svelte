@@ -3,7 +3,7 @@
   import { api, hueFor, total } from './api.js'
   import Strip from './Strip.svelte'
 
-  let { decks, flat, overview, run, notify, onStudy, onAdd } = $props()
+  let { decks, flat, overview, run, notify, onStudy, onAdd, onOptions } = $props()
 
   let menuFor = $state(null)
   let renaming = $state(null)
@@ -11,6 +11,19 @@
   let creating = $state(false)
   let newName = $state('')
   let confirmDelete = $state(null)
+  let filtered = $state(null) // form state for a new filtered deck
+
+  const ORDERS = [
+    [1, 'Zufällig'], [6, 'Nach Fälligkeit'], [8, 'Am stärksten überfällig'], [2, 'Kleinstes Intervall zuerst'],
+    [3, 'Größtes Intervall zuerst'], [4, 'Meiste Fehler zuerst'], [5, 'Reihenfolge des Hinzufügens'], [0, 'Am längsten nicht gesehen'],
+  ]
+
+  async function createFiltered() {
+    const f = filtered
+    if (!f.name.trim() || !f.search.trim()) return notify('Name und Suche angeben', true)
+    const id = await run(() => api.create_filtered_deck(f.name, f.search, f.limit, f.order, f.resched), 'Gefilterter Stapel angelegt')
+    if (id) filtered = null
+  }
 
   const dateLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -29,7 +42,7 @@
   const firstDue = $derived(flat.find((d) => d.depth === 0 && total(d) > 0))
 
   function onKey(e) {
-    if (e.target.closest('input') || e.metaKey || e.ctrlKey) return
+    if ((e.target instanceof Element && e.target.closest('input, textarea, select')) || e.metaKey || e.ctrlKey) return
     if (e.key === ' ' && firstDue) {
       e.preventDefault()
       onStudy(firstDue)
@@ -63,7 +76,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} onclick={(e) => !e.target.closest('.menu-wrap') && (menuFor = confirmDelete = null)} />
+<svelte:window onkeydown={onKey} onclick={(e) => !(e.target instanceof Element && e.target.closest('.menu-wrap')) && (menuFor = confirmDelete = null)} />
 
 <div class="today">
   <header>
@@ -128,9 +141,15 @@
                   <button class="plain" aria-label="Stapel-Aktionen" onclick={() => (menuFor = menuFor === d.id ? null : d.id)}><Ellipsis size={18} /></button>
                   {#if menuFor === d.id}
                     <div class="menu" role="menu">
+                      {#if d.filtered}
+                        <button class="plain" onclick={() => { menuFor = null; run(() => api.rebuild_filtered_deck(d.id), (n) => `${n} Karten gesammelt`) }}>Neu aufbauen</button>
+                        <button class="plain" onclick={() => { menuFor = null; run(() => api.empty_filtered_deck(d.id), 'Karten zurück in ihre Stapel') }}>Leeren</button>
+                      {:else}
+                        <button class="plain" onclick={() => onOptions(d)}>Optionen</button>
+                        <button class="plain" onclick={() => { creating = true; newName = d.name + '::'; menuFor = null }}>Unterstapel anlegen</button>
+                        <button class="plain" onclick={() => exportDeck(d)}>Als .apkg exportieren</button>
+                      {/if}
                       <button class="plain" onclick={() => { renaming = d.id; renameText = d.name; menuFor = null }}>Umbenennen</button>
-                      <button class="plain" onclick={() => { creating = true; newName = d.name + '::'; menuFor = null }}>Unterstapel anlegen</button>
-                      <button class="plain" onclick={() => exportDeck(d)}>Als .apkg exportieren</button>
                       <button class="plain del" onclick={() => remove(d)}>{confirmDelete === d.id ? 'Wirklich löschen?' : 'Löschen'}</button>
                     </div>
                   {/if}
@@ -148,10 +167,30 @@
         <!-- svelte-ignore a11y_autofocus -->
         <input bind:value={newName} placeholder="Name, z. B. Analysis II::Integrale" autofocus
           onkeydown={(e) => e.key === 'Enter' ? create() : e.key === 'Escape' && (creating = false)} onblur={create} />
-      {:else}
+      {:else if !filtered}
         <button class="ghost" onclick={() => (creating = true)}>Neuer Stapel</button>
+        <button class="ghost" onclick={() => (filtered = { name: 'Gefilterter Stapel', search: 'is:due', limit: 100, order: 1, resched: true })}>Gefilterter Stapel</button>
       {/if}
     </div>
+    {#if filtered}
+      <form class="filtered" onsubmit={(e) => { e.preventDefault(); createFiltered() }}>
+        <h2>Gefilterter Stapel</h2>
+        <p class="muted">Sammelt Karten per Suche vorübergehend in einen eigenen Stapel, z. B. zum Pauken vor der Klausur. Leeren schickt sie zurück.</p>
+        <div class="ff">
+          <label>Name<input bind:value={filtered.name} /></label>
+          <label class="wide">Suche (Anki-Syntax)<input bind:value={filtered.search} placeholder={'"deck:Analysis II" is:due'} /></label>
+          <label>Höchstens<input type="number" min="1" bind:value={filtered.limit} /></label>
+          <label>Reihenfolge
+            <select bind:value={filtered.order}>{#each ORDERS as [v, l]}<option value={v}>{l}</option>{/each}</select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" bind:checked={filtered.resched} />Antworten planen Karten um (sonst nur Übung)</label>
+        <div class="fbar">
+          <button type="button" class="ghost" onclick={() => (filtered = null)}>Abbrechen</button>
+          <button type="submit">Anlegen</button>
+        </div>
+      </form>
+    {/if}
   </section>
 </div>
 
@@ -188,6 +227,14 @@
   .menu button { color: var(--ink); justify-content: flex-start; padding: 8px 10px; font-weight: 500; }
   .menu .del { color: var(--m-red); }
   .empty { text-align: left; color: var(--ink-2); padding: 32px 12px; }
-  .new-deck { padding-top: 16px; }
+  .new-deck { padding-top: 16px; display: flex; gap: 8px; }
+  .filtered { margin-top: 20px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; display: flex; flex-direction: column; gap: 12px; max-width: 860px; }
+  .filtered h2 { font-size: 16px; font-weight: 700; }
+  .filtered p { font-size: 13px; }
+  .ff { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .ff label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-2); }
+  .ff .wide { grid-column: span 2; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .fbar { display: flex; justify-content: flex-end; gap: 8px; }
   .new-deck input { width: 360px; }
 </style>

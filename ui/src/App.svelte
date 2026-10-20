@@ -1,12 +1,16 @@
 <script>
-  import { CalendarDays, Plus, Search, Download } from '@lucide/svelte'
+  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear } from '@lucide/svelte'
   import { api, flatten, hueFor, total } from './lib/api.js'
   import Today from './lib/Today.svelte'
   import Study from './lib/Study.svelte'
   import Editor from './lib/Editor.svelte'
   import Browser from './lib/Browser.svelte'
+  import Stats from './lib/Stats.svelte'
+  import DeckOptions from './lib/DeckOptions.svelte'
+  import NoteTypes from './lib/NoteTypes.svelte'
+  import Settings from './lib/Settings.svelte'
 
-  let view = $state({ name: 'today' })
+  let view = $state(/** @type {any} */ ({ name: 'today' }))
   let decks = $state([])
   let overview = $state(null)
   let toast = $state(null)
@@ -58,6 +62,7 @@
       <button class="nav" class:on={view.name === 'today'} onclick={() => go('today')}><CalendarDays size={17} />Heute</button>
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
+      <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
     </nav>
     <div class="label">Stapel</div>
     <nav class="decks">
@@ -69,18 +74,28 @@
         </button>
       {/each}
     </nav>
+    <button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>
+    <button class="nav foot" class:on={view.name === 'settings'} onclick={() => go('settings')}><Gear size={17} />Einstellungen</button>
     <button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>
   </aside>
 
   <main>
     {#if view.name === 'today'}
-      <Today {decks} {flat} {overview} {run} {notify} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
+      <Today {decks} {flat} {overview} {run} {notify} onOptions={(d) => go('options', { deckId: d.id })} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
     {:else if view.name === 'study'}
       <Study deckId={view.deckId} deckName={view.deckName} {flat} {notify} onExit={() => go('today')} />
     {:else if view.name === 'add'}
       <div class="page"><h1>Karten hinzufügen</h1><Editor {flat} {notify} onSaved={refresh} /></div>
     {:else if view.name === 'browse'}
       <Browser {flat} {run} {notify} />
+    {:else if view.name === 'notetypes'}
+      <NoteTypes {notify} />
+    {:else if view.name === 'settings'}
+      <Settings {notify} {refresh} />
+    {:else if view.name === 'stats'}
+      <Stats {flat} {notify} />
+    {:else if view.name === 'options'}
+      {#key view.deckId}<DeckOptions deckId={view.deckId} {notify} onBack={() => go('today')} />{/key}
     {/if}
   </main>
 </div>
@@ -113,6 +128,7 @@
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .count { margin-left: auto; color: var(--ink-2); font-size: 13px; font-weight: 500; }
   .foot { color: var(--ink-2); }
+  .foot.on { color: var(--ink); }
   main { overflow: auto; min-width: 0; }
   .page { padding: 32px 40px; max-width: 880px; display: flex; flex-direction: column; gap: 24px; }
   h1 { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; }

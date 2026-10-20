@@ -1,13 +1,16 @@
 // Bridge to Python (pywebview js_api = Core). Every call returns a Promise.
+const pw = () => /** @type {any} */ (window).pywebview
+
 const ready = new Promise((resolve) => {
-  if (window.pywebview?.api) resolve()
+  if (pw()?.api) resolve()
   else window.addEventListener('pywebviewready', resolve, { once: true })
 })
 
+/** @type {any} */
 export const api = new Proxy({}, {
   get: (_, name) => async (...args) => {
     await ready
-    return window.pywebview.api[name](...args)
+    return pw().api[name](...args)
   },
 })
 

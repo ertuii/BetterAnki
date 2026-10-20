@@ -1,0 +1,184 @@
+<script>
+  import { api } from './api.js'
+  import Bars from './Bars.svelte'
+
+  let { flat, notify } = $props()
+
+  let deckId = $state(0)
+  let days = $state(30)
+  let s = $state(null)
+
+  const PERIODS = [
+    { d: 30, label: '1 Monat' },
+    { d: 90, label: '3 Monate' },
+    { d: 365, label: '1 Jahr' },
+  ]
+
+  const REVIEW_SERIES = [
+    { key: 'young', label: 'Jung', color: 'var(--s-young)' },
+    { key: 'learn', label: 'Lernen', color: 'var(--s-learn)' },
+    { key: 'mature', label: 'Reif', color: 'var(--s-mature)' },
+    { key: 'relearn', label: 'Neu lernen', color: 'var(--s-relearn)' },
+  ]
+  const COUNT_SERIES = [
+    { key: 'new', label: 'Neu', color: 'var(--s-new)' },
+    { key: 'young', label: 'Jung', color: 'var(--s-young)' },
+    { key: 'learn', label: 'Lernen', color: 'var(--s-learn)' },
+    { key: 'mature', label: 'Reif', color: 'var(--s-mature)' },
+    { key: 'relearn', label: 'Neu lernen', color: 'var(--s-relearn)' },
+    { key: 'suspended', label: 'Ausgesetzt', color: 'var(--s-muted)' },
+    { key: 'buried', label: 'Zurückgestellt', color: 'var(--s-muted)' },
+  ]
+  const RET_ROWS = [
+    ['today', 'Heute'], ['yesterday', 'Gestern'], ['week', 'Letzte Woche'],
+    ['month', 'Letzter Monat'], ['year', 'Letztes Jahr'], ['allTime', 'Gesamt'],
+  ]
+  const BUTTONS = ['Nochmal', 'Schwer', 'Gut', 'Einfach']
+
+  async function load() {
+    try {
+      s = await api.statistics(deckId || null, days)
+    } catch (e) {
+      notify(String(e?.message ?? e), true)
+    }
+  }
+  $effect(() => {
+    void [deckId, days]
+    load()
+  })
+
+  const DAY = 86400000
+  const dayLabel = (offset) => new Date(Date.now() + offset * DAY).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })
+  const tickEvery = $derived(days <= 30 ? 7 : days <= 90 ? 14 : 60)
+  const sum = (arr) => arr.reduce((a, b) => a + b, 0)
+  const pct = (a, b) => (b ? `${Math.round((100 * a) / b)} %` : '–')
+
+  const futureRows = $derived(s ? s.future.map((n) => ({ n })) : [])
+  const reviewTotal = $derived(s ? sum(s.reviews.map((r) => r.learn + r.relearn + r.young + r.mature)) : 0)
+  const activeDays = $derived(s ? s.reviews.filter((r) => r.learn + r.relearn + r.young + r.mature > 0).length : 0)
+  const cardTotal = $derived(s ? sum(Object.values(s.card_counts)) : 0)
+</script>
+
+<div class="stats">
+  <header>
+    <h1>Statistik</h1>
+    <div class="filters">
+      <select bind:value={deckId} aria-label="Stapel">
+        <option value={0}>Alle Stapel</option>
+        {#each flat as d}<option value={d.id}>{' '.repeat(d.depth)}{d.short}</option>{/each}
+      </select>
+      <div class="seg" role="radiogroup" aria-label="Zeitraum">
+        {#each PERIODS as p}
+          <button role="radio" aria-checked={days === p.d} class:on={days === p.d} onclick={() => (days = p.d)}>{p.label}</button>
+        {/each}
+      </div>
+    </div>
+  </header>
+
+  {#if s}
+    <dl class="facts">
+      <div><dt class="num">{s.today.answered}</dt><dd>Karten heute</dd></div>
+      <div><dt class="num">{s.today.minutes} min</dt><dd>Lernzeit heute</dd></div>
+      <div><dt class="num">{s.today.correct_pct != null ? `${s.today.correct_pct} %` : '–'}</dt><dd>heute richtig</dd></div>
+      <div><dt class="num">{s.future[1] ?? 0}</dt><dd>morgen fällig</dd></div>
+      <div><dt class="num">{activeDays} / {days}</dt><dd>Tage gelernt</dd></div>
+    </dl>
+
+    <div class="grid">
+      <section class="wide">
+        <h2>Wiederholungen</h2>
+        <p class="muted">{reviewTotal} Antworten in diesem Zeitraum, nach Kartenstatus.</p>
+        <Bars rows={s.reviews} series={REVIEW_SERIES} labels={s.reviews.map((_, i) => dayLabel(i - days + 1))} {tickEvery}
+          tip={(r, i) => `<b>${dayLabel(i - days + 1)}</b><br>${REVIEW_SERIES.filter((x) => r[x.key]).map((x) => `${x.label}: ${r[x.key]}`).join('<br>') || 'nichts gelernt'}`} />
+      </section>
+
+      <section class="wide">
+        <h2>Prognose</h2>
+        <p class="muted">Fällige Wiederholungen der nächsten {days} Tage, Rückstand zählt auf heute.</p>
+        <Bars rows={futureRows} series={[{ key: 'n', label: 'Fällig', color: 'var(--s-mature)' }]} labels={futureRows.map((_, i) => dayLabel(i))} {tickEvery}
+          tip={(r, i) => `<b>${i === 0 ? 'Heute' : dayLabel(i)}</b><br>${r.n} fällig`} />
+      </section>
+
+      <section>
+        <h2>Kartenzahlen</h2>
+        <p class="muted">{cardTotal} Karten insgesamt.</p>
+        <div class="hbar" role="img" aria-label="Verteilung der Karten nach Status">
+          {#each COUNT_SERIES as c}
+            {#if s.card_counts[c.key]}<span style:flex={s.card_counts[c.key]} style:background={c.color} title="{c.label}: {s.card_counts[c.key]}"></span>{/if}
+          {/each}
+        </div>
+        <table class="small">
+          <tbody>
+            {#each COUNT_SERIES as c}
+              <tr><td><i class="key" style:background={c.color}></i>{c.label}</td><td class="num">{s.card_counts[c.key]}</td><td class="num muted">{pct(s.card_counts[c.key], cardTotal)}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Intervalle</h2>
+        <p class="muted">Abstand bis zur nächsten Wiederholung, Karten in der Wiederholung.</p>
+        <Bars rows={s.intervals} series={[{ key: 'n', label: 'Karten', color: 'var(--s-young)' }]} labels={s.intervals.map((b) => b.label)} tickEvery={2}
+          tip={(r) => `<b>${r.label}</b><br>${r.n} Karten`} />
+      </section>
+
+      <section>
+        <h2>Tageszeit</h2>
+        <p class="muted">Wann du lernst; Tooltip zeigt die Trefferquote.</p>
+        <Bars rows={s.hours} series={[{ key: 'total', label: 'Antworten', color: 'var(--s-new)' }]} labels={s.hours.map((_, i) => `${i}`)} tickEvery={6}
+          tip={(r, i) => `<b>${i}–${i + 1} Uhr</b><br>${r.total} Antworten<br>${pct(r.correct, r.total)} richtig`} />
+      </section>
+
+      <section>
+        <h2>Erinnerung</h2>
+        <p class="muted">Anteil richtig beantworteter Wiederholungen (ohne Lernphase).</p>
+        <table class="small">
+          <thead><tr><th>Zeitraum</th><th>Richtig</th><th>Wiederholungen</th></tr></thead>
+          <tbody>
+            {#each RET_ROWS as [k, label]}
+              <tr><td>{label}</td><td class="num">{s.retention[k]?.pct != null ? `${s.retention[k].pct} %` : '–'}</td><td class="num muted">{s.retention[k]?.total ?? 0}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="wide">
+        <h2>Antworttasten</h2>
+        <p class="muted">Wie oft du welche Taste gedrückt hast, im gewählten Zeitraum.</p>
+        <table class="small">
+          <thead><tr><th>Kartenstatus</th>{#each BUTTONS as b}<th>{b}</th>{/each}<th>Richtig</th></tr></thead>
+          <tbody>
+            {#each [['learning', 'Lernen'], ['young', 'Jung'], ['mature', 'Reif']] as [k, label]}
+              {@const row = s.buttons[k] ?? [0, 0, 0, 0]}
+              <tr><td>{label}</td>{#each row as n}<td class="num">{n}</td>{/each}<td class="num muted">{pct(sum(row) - row[0], sum(row))}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  {/if}
+</div>
+
+<style>
+  .stats { padding: 32px 40px 56px; max-width: 1280px; display: flex; flex-direction: column; gap: 28px; }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; margin-right: auto; }
+  .filters { display: flex; gap: 8px; }
+  .filters select { width: 220px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule-2); border-radius: var(--radius); padding: 2px; }
+  .seg button { background: transparent; color: var(--ink-2); border: 0; height: 30px; padding: 0 12px; font-weight: 500; }
+  .seg button.on { background: var(--ink); color: var(--paper); }
+  .facts { display: flex; gap: 40px; flex-wrap: wrap; margin: 0; }
+  .facts div { display: flex; flex-direction: column; }
+  dt { font-size: 22px; font-weight: 700; }
+  dd { margin: 0; color: var(--ink-2); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 40px 48px; }
+  section { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size: 16px; font-weight: 700; }
+  section > p { font-size: 13px; margin-bottom: 10px; }
+  .hbar { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; background: var(--paper-3); }
+  table.small td, table.small th { padding: 7px 10px; font-size: 13px; }
+  .key { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 8px; vertical-align: -1px; }
+</style>

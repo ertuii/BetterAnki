@@ -7,6 +7,20 @@ Deine Daten liegen lokal:
 - macOS: `~/Library/Application Support/BetterAnki/collection.anki2`
 - Windows: `%APPDATA%\BetterAnki\collection.anki2`
 
+## Funktionen
+
+- **Heute:** fällige Karten, Semesterstreifen (Lernverlauf + Prognose), Stapel mit Unterstapeln
+- **Lernen:** Tastatur (Leertaste, 1–4), Bearbeiten, Rückgängig, Zurückstellen, Audio, Vorlesen (`{{tts de_DE:Feld}}`)
+- **Hinzufügen / Browser:** Rich-Text-Felder, Lückentext, Suche mit Anki-Syntax, Filter nach Stapel und Status, Aussetzen, Markieren, Verschieben
+- **Stapel-Optionen:** Voreinstellungen, Tageslimits, Lernschritte, Lästlinge, Zurückstellen, **FSRS** inkl. Optimierung
+- **Gefilterte Stapel:** Karten per Suche zum Pauken sammeln
+- **Statistik:** Wiederholungen, Prognose, Kartenzahlen, Intervalle, Tageszeit, Erinnerung, Antworttasten
+- **Notiztypen:** Felder, Kartenvorlagen und CSS bearbeiten, mit Live-Vorschau
+- **Einstellungen:** optionale AnkiWeb-Synchronisierung, automatische Sicherungen + Wiederherstellen, Export der ganzen Sammlung, Claude-Befehl zum Kopieren
+- **Import/Export:** `.apkg`, `.colpkg`, CSV
+
+Noch nicht: Bild-Verdeckung (Image Occlusion), Add-ons.
+
 ## Starten (Entwicklung)
 
 ```sh
@@ -36,7 +50,9 @@ Windows: Pfad zur `BetterAnki.exe` statt der Mac-App. Während der Entwicklung g
 
 Läuft die App, schreibt Claude direkt in die offene Sammlung (neue Karten erscheinen sofort). Ist sie geschlossen, öffnet der MCP-Server die Sammlung selbst.
 
-Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `import_file`, `export_deck`.
+Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `review_statistics`, `create_filtered_deck`, `import_file`, `export_deck`.
+
+Der passende Befehl für deine Installation steht in der App unter **Einstellungen → Claude verbinden**.
 
 ## Tastatur
 
@@ -45,7 +61,8 @@ Heute: `Leertaste` lernen, `A` hinzufügen. Lernen: `Leertaste` aufdecken / Gut,
 ## Test
 
 ```sh
-uv run python tests/test_core.py
+uv run python tests/test_core.py && uv run python tests/test_phase2.py
+cd ui && npm run check
 ```
 
 Lizenz: AGPL-3.0 (wie Anki).

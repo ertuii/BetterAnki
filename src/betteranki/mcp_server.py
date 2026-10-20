@@ -116,8 +116,21 @@ def collection_stats() -> dict:
 
 
 @mcp.tool()
+def review_statistics(deck_id: int | None = None, days: int = 30) -> dict:
+    """Study statistics: today's answers, reviews per day, forecast of due cards, card counts by state,
+    interval distribution, answer buttons, true retention. days: 30, 90 or 365."""
+    return call("statistics", deck_id=deck_id, days=days)
+
+
+@mcp.tool()
+def create_filtered_deck(name: str, search: str, limit: int = 100) -> int:
+    """Gather cards matching an Anki search into a temporary study deck (e.g. 'deck:Statistik is:due' for cramming)."""
+    return call("create_filtered_deck", name=name, search=search, limit=limit)
+
+
+@mcp.tool()
 def import_file(path: str) -> str:
-    """Import an .apkg or .csv/.txt/.tsv file from an absolute path."""
+    """Import an .apkg or .csv/.txt/.tsv file from an absolute path. (.colpkg replaces the whole collection: only on explicit user request.)"""
     return call("import_file", path=path)
 
 

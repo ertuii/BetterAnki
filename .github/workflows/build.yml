@@ -13,6 +13,9 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run python tests/test_core.py
+      - run: uv run python tests/test_phase2.py
+      - run: npm ci && npm run check
+        working-directory: ui
       - run: uv run python build.py
       - uses: actions/upload-artifact@v4
         with:

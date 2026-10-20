@@ -22,6 +22,14 @@
   --learn: var(--m-red);
   --review: var(--m-green);
 
+  /* chart series for card states (validated: dataviz validate_palette, light + dark) */
+  --s-new: #2a78d6;
+  --s-young: #1baf7a;
+  --s-learn: #e34948;
+  --s-mature: #008300;
+  --s-relearn: #eda100;
+  --s-muted: #c6c2b9;
+
   --warn-bg: #fbefd0;
   --warn-ink: #7a5600;
   --heat-1: #d3e1f8;
@@ -53,6 +61,12 @@
     --m-violet: #a283ec;
     --m-teal: #3cc1bb;
     --m-pink: #ee70a6;
+    --s-new: #3987e5;
+    --s-young: #199e70;
+    --s-learn: #e66767;
+    --s-mature: #008300;
+    --s-relearn: #c98500;
+    --s-muted: #44454b;
     --warn-bg: #3a2f12;
     --warn-ink: #f2cf74;
     --heat-1: #24344f;

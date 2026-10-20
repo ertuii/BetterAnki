@@ -17,7 +17,7 @@
         return { n, ago, level, kind: ago === 0 ? 'today' : 'past' }
       }),
       ...future.map((n, i) => ({ n, ago: -(i + 1), level: 0, kind: 'future' })),
-    ].map((c) => ({ ...c, date: new Date(now - c.ago * DAY) }))
+    ].map((c) => ({ ...c, date: new Date(now.getTime() - c.ago * DAY) }))
     // ponytail: narrow windows drop the oldest days instead of shrinking cells below ~6px
     const fit = Math.max(future.length + 14, Math.floor(width / 9))
     return all.slice(-fit)

@@ -2,6 +2,7 @@
   import { ArrowLeft, Pencil, Undo2 } from '@lucide/svelte'
   import { api } from './api.js'
   import Editor from './Editor.svelte'
+  import CardFrame from './CardFrame.svelte'
 
   let { deckId, deckName, flat, notify, onExit } = $props()
 
@@ -10,7 +11,6 @@
   let revealed = $state(false)
   let editing = $state(false)
   let busy = false
-  let frame = $state()
 
   const BUTTONS = [
     { ease: 1, label: 'Nochmal', cls: 'again' },
@@ -19,30 +19,11 @@
     { ease: 4, label: 'Einfach', cls: 'easy' },
   ]
 
-  const dark = matchMedia('(prefers-color-scheme: dark)')
-
   async function next() {
     card = await api.next_card(deckId)
     revealed = false
     done = !card
   }
-
-  // Card HTML/CSS is user content: render it isolated in an iframe, media resolved from /media/.
-  const srcdoc = $derived(card && `<!doctype html><html><head><meta charset="utf-8">
-<base href="${location.origin}/media/">
-<style>
-  html,body{margin:0;min-height:100%}
-  body{padding:56px 40px;font-family:system-ui,sans-serif;font-size:20px;line-height:1.5}
-  .card.nightMode{color:#ecebe6;background-color:#222326}
-  img{max-width:100%;height:auto}
-  hr#answer{border:0;border-top:1px solid #8884;margin:28px 0}
-  audio{display:block;margin:12px auto}
-</style><style>${card.css}</style>
-<script>
-  addEventListener('keydown', (e) => parent.postMessage({ key: e.key, meta: e.metaKey || e.ctrlKey }, '*'))
-  addEventListener('load', () => document.getElementById('answer')?.scrollIntoView())
-<\/script></head>
-<body class="card card${card.ord + 1}${dark.matches ? ' nightMode night_mode' : ''}">${revealed ? card.answer : card.question}</body></html>`)
 
   function reveal() {
     revealed = true
@@ -85,16 +66,10 @@
     if (revealed && ['1', '2', '3', '4'].includes(e.key)) answer(Number(e.key))
   }
 
-  // The card iframe is sandboxed without same-origin (card HTML can't reach the app API); it forwards keys.
-  function onMessage(e) {
-    if (e.source !== frame?.contentWindow || typeof e.data?.key !== 'string') return
-    onKey({ key: e.data.key, metaKey: e.data.meta, ctrlKey: false, preventDefault() {} })
-  }
-
   next()
 </script>
 
-<svelte:window onkeydown={onKey} onmessage={onMessage} />
+<svelte:window onkeydown={onKey} />
 
 <div class="study">
   <header>
@@ -123,7 +98,7 @@
     </div>
   {:else if card}
     <div class="card-area">
-      <iframe bind:this={frame} title="Karte" {srcdoc} sandbox="allow-scripts" allow="autoplay"></iframe>
+      <CardFrame html={revealed ? card.answer : card.question} css={card.css} ord={card.ord} onkey={onKey} />
     </div>
     <footer>
       {#if !revealed}
@@ -161,11 +136,10 @@
   .c-new { color: var(--new); } .c-learn { color: var(--learn); } .c-review { color: var(--review); }
   .tools { display: flex; gap: 4px; }
   .card-area { flex: 1; display: flex; justify-content: center; padding: 8px 32px 0; min-height: 0; }
-  iframe {
-    width: min(860px, 100%); height: 100%; border: 0; border-radius: 14px 14px 0 0;
-    background: #fff; box-shadow: 0 2px 4px rgb(0 0 0 / 0.04), 0 12px 40px rgb(0 0 0 / 0.08);
+  .card-area :global(iframe) {
+    width: min(860px, 100%); border-radius: 14px 14px 0 0;
+    box-shadow: 0 2px 4px rgb(0 0 0 / 0.04), 0 12px 40px rgb(0 0 0 / 0.08);
   }
-  @media (prefers-color-scheme: dark) { iframe { background: #222326; } }
   footer { display: flex; justify-content: center; padding: 20px 32px 28px; border-top: 1px solid var(--rule); }
   .reveal { height: 46px; padding: 0 28px; font-size: 15px; }
   kbd.inv { color: var(--paper); border-color: color-mix(in srgb, var(--paper) 40%, transparent); }

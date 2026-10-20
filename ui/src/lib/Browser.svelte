@@ -101,7 +101,7 @@
 
   // Re-run whenever a filter select changes (the text field is debounced separately).
   $effect(() => {
-    deckFilter, status
+    void [deckFilter, status]
     untrack(search) // only the selects trigger this; typing goes through searchSoon
   })
 </script>
@@ -129,11 +129,11 @@
         <button class="ghost sm" onclick={() => bulk(() => api.suspend(ids, !allSuspended), allSuspended ? 'Fortgesetzt' : 'Ausgesetzt')}>
           {allSuspended ? 'Fortsetzen' : 'Aussetzen'}
         </button>
-        <select class="sm" aria-label="Markierung setzen" onchange={(e) => { bulk(() => api.flag(ids, Number(e.target.value)), 'Markiert'); e.target.value = '' }}>
+        <select class="sm" aria-label="Markierung setzen" onchange={(e) => { bulk(() => api.flag(ids, Number(e.currentTarget.value)), 'Markiert'); e.currentTarget.value = '' }}>
           <option value="">Markieren</option>
           {#each FLAGS as f}<option value={f.n}>{f.label}</option>{/each}
         </select>
-        <select class="sm" aria-label="In Stapel verschieben" onchange={(e) => { bulk(() => api.move_cards(ids, Number(e.target.value)), 'Verschoben'); e.target.value = '' }}>
+        <select class="sm" aria-label="In Stapel verschieben" onchange={(e) => { bulk(() => api.move_cards(ids, Number(e.currentTarget.value)), 'Verschoben'); e.currentTarget.value = '' }}>
           <option value="">Verschieben nach</option>
           {#each flat as d}<option value={d.id}>{'\u2003'.repeat(d.depth)}{d.short}</option>{/each}
         </select>
