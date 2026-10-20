@@ -34,11 +34,29 @@ class Handler(SimpleHTTPRequestHandler):
         target = (media / path.removeprefix("/media/").lstrip("/")).resolve()
         return str(target) if target.is_relative_to(media) else ""
 
+    def _foreign_host(self) -> bool:
+        """DNS rebinding: a website whose name suddenly resolves to 127.0.0.1 sends its own name as Host."""
+        port = self.server.server_address[1]
+        if self.headers.get("Host") in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return False
+        self.send_error(403)
+        return True
+
+    def do_GET(self):
+        if not self._foreign_host():
+            super().do_GET()
+
+    def do_HEAD(self):
+        if not self._foreign_host():
+            super().do_HEAD()
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_POST(self):
+        if self._foreign_host():
+            return
         if self.path != "/rpc" or not secrets.compare_digest(self.headers.get("X-Token", ""), self.token):
             self.send_error(403)
             return

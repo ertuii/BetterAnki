@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
-    "@lucide/svelte": "^1.60.0"
+    "@lucide/svelte": "^1.60.0",
+    "dompurify": "3.4.16"
   }
 }

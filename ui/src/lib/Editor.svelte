@@ -1,5 +1,10 @@
 <script>
+  import DOMPurify from 'dompurify'
   import { api } from './api.js'
+
+  // Note HTML (imported decks, cards from Claude) runs in the app window here, unlike CardFrame's sandbox:
+  // everything that reaches a field is sanitized, or it could call window.pywebview.api.
+  const clean = (html) => DOMPurify.sanitize(html)
 
   // Add mode without noteId, edit mode with it.
   let { noteId = null, flat, notify, onSaved, onCancel = null } = $props()
@@ -8,6 +13,8 @@
   let typeId = $state(null)
   let deckId = $state(null)
   let fields = $state({})
+  let stored = {} // edit mode: field values as saved, and as shown after sanitizing
+  let shown = {}
   let tags = $state('')
   let saving = $state(false)
   let editors = $state([])
@@ -23,7 +30,9 @@
       const n = await api.get_note(noteId)
       typeId = n.notetype_id
       deckId = n.deck_id
-      fields = n.fields
+      stored = n.fields
+      shown = Object.fromEntries(Object.entries(n.fields).map(([k, v]) => [k, clean(v)]))
+      fields = { ...shown }
       tags = n.tags.join(' ')
     } else {
       typeId = types.some((t) => t.id === recall('ba.type')) ? recall('ba.type') : (types.find((t) => t.basic) ?? types[0])?.id
@@ -43,7 +52,9 @@
     saving = true
     try {
       if (noteId) {
-        await api.update_note(noteId, $state.snapshot(fields), tagList, deckId)
+        // fields left untouched keep their stored HTML; only edited ones are saved in sanitized form
+        const out = Object.fromEntries(Object.entries($state.snapshot(fields)).map(([k, v]) => [k, v === shown[k] ? stored[k] : v]))
+        await api.update_note(noteId, out, tagList, deckId)
         notify('Gespeichert')
       } else {
         await api.add_note(typeId, deckId, $state.snapshot(fields), tagList)
@@ -83,7 +94,7 @@
       })
       const name = await api.add_media(f.name || `bild-${Date.now()}.png`, b64)
       const html = f.type.startsWith('image/') ? `<img src="${name}">` : `[sound:${name}]`
-      document.execCommand('insertHTML', false, html)
+      document.execCommand('insertHTML', false, clean(html)) // the file name is untrusted
     }
   }
 
@@ -95,11 +106,21 @@
     } else if (pasteStrips) {
       e.preventDefault()
       document.execCommand('insertText', false, e.clipboardData.getData('text/plain'))
+    } else if (e.clipboardData?.types.includes('text/html')) {
+      e.preventDefault()
+      document.execCommand('insertHTML', false, clean(e.clipboardData.getData('text/html')))
     }
   }
 
   function onDrop(e) {
     const files = [...(e.dataTransfer?.files ?? [])]
+    if (!files.length && e.dataTransfer?.types.includes('text/html')) {
+      e.preventDefault()
+      e.stopPropagation()
+      const at = document.caretRangeFromPoint?.(e.clientX, e.clientY) // insert where it was dropped
+      if (at) getSelection().removeAllRanges(), getSelection().addRange(at)
+      return document.execCommand('insertHTML', false, clean(e.dataTransfer.getData('text/html')))
+    }
     if (!files.length) return
     e.preventDefault()
     e.stopPropagation() // not an import: keep it away from the window-level drop handler

@@ -84,6 +84,18 @@ assert not col.find_cards('"deck:Bio" -is:new')
 assert col.get_card(cards["zelle"][0]).lapses == 0
 assert core.undo() and col.find_cards('"deck:Bio" -is:new')
 
+# local server: requests with a foreign Host header (DNS rebinding) are refused
+import http.client  # noqa: E402
+
+from betteranki import server  # noqa: E402
+
+port = int(server.start(core).rsplit(":", 1)[1].strip("/"))
+for host, refused in ((f"127.0.0.1:{port}", False), (f"localhost:{port}", False), (f"evil.example:{port}", True)):
+    conn = http.client.HTTPConnection("127.0.0.1", port)
+    conn.request("GET", "/", headers={"Host": host})
+    assert (conn.getresponse().status == 403) == refused, host  # "/" is 404 in CI before the UI is built
+server.stop()
+
 core.set_exam(bio, None)
 assert core.exam_plan() == []
 core._close()
