@@ -11,6 +11,8 @@
   let card = $state(null)
   let done = $state(false)
   let revealed = $state(false)
+  let typed = '' // {{type:Field}}: what was typed into the card
+  let answerHtml = $state('')
   let editing = $state(false)
   let busy = false
   let prefs = $state({ show_remaining_due_counts: true, show_intervals_on_buttons: true, time_limit_secs: 0, hide_audio_play_buttons: false })
@@ -38,7 +40,24 @@
   $effect(() => () => {
     clearInterval(tick)
     clearTimeout(advanceTimer)
+    api.leave_study()
   })
+  $effect(() => {
+    window.addEventListener('ba-note-changed', reload)
+    return () => window.removeEventListener('ba-note-changed', reload)
+  })
+
+  // Claude changed a note (MCP), maybe this one: show the new version without losing the place
+  async function reload() {
+    if (!card || editing || busy) return
+    const fresh = await fetchCard()
+    if (fresh?.card_id === card.card_id && (fresh.question !== card.question || fresh.answer !== card.answer)) await show(fresh)
+  }
+
+  async function show(fresh) {
+    card = fresh
+    if (revealed && card) await reveal()
+  }
   const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
 
   // Anki's "auto advance": toggled with A, timings and actions come from the deck's preset.
@@ -72,12 +91,15 @@
     timeUp = plan && minutes > 0 && Date.now() - sessionStart >= minutes * 60000
     card = timeUp ? null : await fetchCard()
     revealed = false
+    typed = ''
     done = !card
     shownAt = Date.now()
     elapsed = 0
   }
 
-  function reveal() {
+  async function reveal() {
+    const cmp = card.type_answer ? await api.compare_answer(card.card_id, typed) : ''
+    answerHtml = card.answer.replace('[[typeans]]', () => cmp)
     revealed = true
   }
 
@@ -188,7 +210,7 @@
     </div>
   {:else if card}
     <div class="card-area">
-      <CardFrame html={revealed ? card.answer : card.question} css={card.css} ord={card.ord} onkey={onKey}
+      <CardFrame html={revealed ? answerHtml : card.question} css={card.css} ord={card.ord} onkey={onKey} ontyped={(t) => (typed = t)}
         autoplay={card.study.autoplay} hideAudio={prefs.hide_audio_play_buttons} />
     </div>
     <footer>
@@ -213,7 +235,7 @@
   <div class="sheet-backdrop" onclick={(e) => e.target === e.currentTarget && (editing = false)} role="presentation">
     <div class="sheet" role="dialog" aria-label="Karte bearbeiten">
       <h2>Notiz bearbeiten</h2>
-      <Editor noteId={card.note_id} {flat} {notify} onSaved={async () => { editing = false; card = await fetchCard() }} onCancel={() => (editing = false)} />
+      <Editor noteId={card.note_id} {flat} {notify} onSaved={async () => { editing = false; await show(await fetchCard()) }} onCancel={() => (editing = false)} />
     </div>
   </div>
 {/if}

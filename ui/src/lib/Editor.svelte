@@ -1,6 +1,7 @@
 <script>
   import DOMPurify from 'dompurify'
   import { api } from './api.js'
+  import IOEditor from './IOEditor.svelte'
 
   // Note HTML (imported decks, cards from Claude) runs in the app window here, unlike CardFrame's sandbox:
   // everything that reaches a field is sanitized, or it could call window.pywebview.api.
@@ -20,6 +21,17 @@
   let editors = $state([])
 
   const type = $derived(types.find((t) => t.id === typeId))
+  const names = $derived(Object.keys(fields))
+
+  // like Anki: warn while typing when the first field already exists in a note of this type
+  let dupe = $state(null)
+  let dupeTimer
+  $effect(() => {
+    const first = names.length && !type?.io ? fields[names[0]] : ''
+    clearTimeout(dupeTimer)
+    if (!first) return void (dupe = null)
+    dupeTimer = setTimeout(async () => (dupe = await api.duplicate_of(typeId, first, noteId)), 300)
+  })
 
   const remember = (k, v) => { try { localStorage.setItem(k, String(v)) } catch {} }
   const recall = (k) => { try { return Number(localStorage.getItem(k)) || null } catch { return null } }
@@ -49,6 +61,8 @@
   async function save() {
     if (saving) return
     const tagList = tags.split(/\s+/).filter(Boolean)
+    if (type?.io && !fields[names[1]]) return notify('Füge zuerst ein Bild ein.', true)
+    if (type?.io && !fields[names[0]]) return notify('Zieh auf dem Bild mindestens einen Bereich auf.', true)
     saving = true
     try {
       if (noteId) {
@@ -151,12 +165,19 @@
     </label>
   </div>
 
-  {#each Object.keys(fields) as name, i (name)}
+  {#if type?.io && names.length >= 2}
+    <IOEditor bind:occlusion={fields[names[0]]} bind:image={fields[names[1]]} {notify} />
+  {/if}
+
+  {#each names as name, i (name)}
+    {#if !type?.io || i > 1}
     <div class="field">
       <span class="fname">{name}</span>
       <div class="rich" contenteditable="true" role="textbox" aria-multiline="true" aria-label={name} tabindex="0"
         bind:this={editors[i]} bind:innerHTML={fields[name]} onkeydown={onKey} onpaste={onPaste} ondrop={onDrop}></div>
+      {#if i === 0 && dupe}<span class="dupe">Eine Notiz mit diesem ersten Feld gibt es schon.</span>{/if}
     </div>
+    {/if}
   {/each}
 
   <label class="field">
@@ -188,5 +209,6 @@
   .rich :global(img) { max-width: 100%; }
   .bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
   .hint { margin-right: auto; font-size: 13px; }
+  .dupe { font-size: 13px; color: var(--m-red); }
   kbd.inv { color: var(--paper); border-color: color-mix(in srgb, var(--paper) 40%, transparent); }
 </style>

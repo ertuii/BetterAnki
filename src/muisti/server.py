@@ -52,6 +52,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
+        if self.path.startswith("/katex/"):  # fonts for formulas, fetched from the sandboxed card frame (origin "null")
+            self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
 
     def do_POST(self):
@@ -67,7 +69,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError(f"not allowed: {method}")
             body = {"result": getattr(self.core, method)(**req.get("args", {}))}
             try:  # /rpc is Claude (MCP): show its changes, e.g. new cards in the inbox, right away
-                self.core._window and self.core._window.evaluate_js("window.__baRefresh && window.__baRefresh()")
+                self.core._window and self.core._window.evaluate_js(f"window.__baRefresh && window.__baRefresh({json.dumps(method)})")
             except Exception:
                 pass  # window closing; the result still counts
         except Exception as e:

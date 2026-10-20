@@ -104,6 +104,7 @@ class Core:
         self._lock = threading.RLock()  # ponytail: one lock for everything, the collection is single-user anyway
         self._window = None  # set by app.py for file dialogs
         self._current = None  # (card, states) of the card being studied
+        self._typed = None  # (expected, combining) when the current card has {{type:Field}}
 
     def _close(self):
         self._col.close()
@@ -523,17 +524,69 @@ class Core:
         self._current = (card, qc.states)
         labels = self._col.sched.describe_next_states(qc.states)
         study = self._study_options(card)
+        question, answer = self._type_answer(card, self._render(card, "q", study["autoplay"]), self._render(card, "a", study["autoplay"]))
         return {
             "card_id": card.id,
             "note_id": card.nid,
             "ord": card.ord,
-            "question": self._render(card, "q", study["autoplay"]),
-            "answer": self._render(card, "a", study["autoplay"]),
+            "question": question,
+            "answer": answer,
+            "type_answer": self._typed is not None,  # the UI swaps [[typeans]] in the answer for compare_answer()
             "css": card.render_output().css,
             "buttons": [_strip(x) for x in labels],  # interval labels for Again/Hard/Good/Easy
             "counts": {"new": queued.new_count, "learn": queued.learning_count, "review": queued.review_count},
             "queue": qc.queue,  # 0 new, 1 learning, 2 review
             "study": study,
+        }
+
+    _TYPE = re.compile(r"\[\[type:(.+?)\]\]")
+
+    def _type_answer(self, card, question: str, answer: str) -> tuple[str, str]:
+        """{{type:Field}}, {{type:cloze:Text}}, {{type:nc:Field}}: an input on the front, the comparison on the back (like Anki's reviewer)."""
+        self._typed = None
+        m = self._TYPE.search(question)
+        if not m:
+            return question, self._TYPE.sub("", answer)
+        fld, cloze, combining = m.group(1), False, True
+        if fld.startswith("cloze:"):
+            cloze, fld = True, fld.split(":", 1)[1]
+        if fld.startswith("nc:"):
+            combining, fld = False, fld.split(":", 1)[1]
+        note = card.note()
+        if fld not in note:
+            return self._TYPE.sub(f"<p>Feld „{html.escape(fld)}“ zum Eintippen gibt es nicht.</p>", question), self._TYPE.sub("", answer)
+        expected = self._col.extract_cloze_for_typing(note[fld], card.ord + 1) if cloze else note[fld]
+        self._typed = (expected, combining)
+        field = '<input id="typeans" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">'
+        return self._TYPE.sub(field, question, count=1), self._TYPE.sub("[[typeans]]", answer, count=1)
+
+    @_locked
+    def compare_answer(self, card_id: int, typed: str) -> str:
+        """Anki's diff of the typed answer against the field (HTML)."""
+        card = self._current[0] if self._current else None
+        if not card or card.id != card_id or not self._typed:
+            raise ValueError("card is no longer current")
+        expected, combining = self._typed
+        return self._col.compare_answer(expected, typed, combining)  # <code id=typeans>…</code>
+
+    @_locked
+    def leave_study(self) -> None:
+        """The study screen was closed: nothing is current for current_card() anymore."""
+        self._current = self._typed = None
+
+    @_locked
+    def current_card(self) -> dict | None:
+        """The card on the study screen right now (for Claude: 'explain this', 'improve this card')."""
+        if not self._current:
+            return None
+        card = self._current[0]
+        note = card.note()
+        out = card.render_output()
+        return {
+            "card_id": card.id, "note_id": note.id, "notetype": note.note_type()["name"],
+            "deck": self._col.decks.name(card.odid or card.did), "fields": dict(note.items()), "tags": note.tags,
+            "question": _strip(out.question_text), "answer": _strip(out.answer_text),
+            "lapses": card.lapses, "reviews": card.reps, "interval_days": card.ivl,
         }
 
     def _study_options(self, card) -> dict:
@@ -794,10 +847,12 @@ class Core:
 
     @_locked
     def note_types(self) -> list[dict]:
+        if not any(m.get("originalStockKind") == 6 for m in self._col.models.all()):
+            self._col.add_image_occlusion_notetype()  # Anki's own type; its fields are Occlusion, Image, Header, Back Extra, Comments
         return [
-            {"id": m["id"], "name": m["name"], "fields": [f["name"] for f in m["flds"]], "cloze": m["type"] == 1, "basic": m.get("originalStockKind") == 1}
+            {"id": m["id"], "name": m["name"], "fields": [f["name"] for f in m["flds"]], "cloze": m["type"] == 1,
+             "basic": m.get("originalStockKind") == 1, "io": m.get("originalStockKind") == 6}
             for m in self._col.models.all()
-            if m.get("originalStockKind") != 6  # ponytail: image occlusion needs its own editor, phase 2
         ]
 
     def _notetype(self, notetype):
@@ -821,12 +876,29 @@ class Core:
                 raise ValueError(f"unknown field '{k}', expected one of {names}")
             note[k] = v
 
+    def _duplicate_of(self, note) -> int | None:
+        """Another note of the same type with the same first field (Anki's dupe check, HTML ignored)."""
+        from anki.collection import SearchNode
+
+        if not _strip(note.fields[0]):
+            return None
+        node = SearchNode(dupe=SearchNode.Dupe(notetype_id=note.mid, first_field=note.fields[0]))
+        return next((i for i in self._col.find_notes(self._col.build_search_string(node)) if i != note.id), None)
+
     @_locked
-    def add_note(self, notetype, deck, fields, tags: list[str] | None = None, inbox: bool = False) -> int:
+    def duplicate_of(self, notetype, first_field: str, note_id: int | None = None) -> int | None:
+        note = self._col.get_note(note_id) if note_id else self._col.new_note(self._notetype(notetype))
+        note.fields[0] = first_field
+        return self._duplicate_of(note)
+
+    @_locked
+    def add_note(self, notetype, deck, fields, tags: list[str] | None = None, inbox: bool = False, allow_duplicate: bool = True) -> int:
         """notetype/deck: name or id. fields: {name: value} or list in field order.
         inbox: a card made by Claude; waits suspended in the inbox for review if that feature is on."""
         note = self._col.new_note(self._notetype(notetype))
         self._fill(note, fields)
+        if not allow_duplicate and (dup := self._duplicate_of(note)):
+            raise ValueError(f"duplicate of note {dup} (same first field); update that note instead, or pass allow_duplicate")
         inbox = inbox and self.features()["inbox"]
         note.tags = (tags or []) + ([self._INBOX_TAG] if inbox else [])
         deck_id = deck if isinstance(deck, int) else self._col.decks.id(deck)

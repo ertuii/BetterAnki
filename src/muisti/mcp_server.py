@@ -1,9 +1,11 @@
 """MCP stdio server. Forwards to the running app (the collection is exclusively locked),
 or opens the collection itself for the duration of one call when the app is closed."""
 
+import base64
 import json
 import threading
 import urllib.request
+from pathlib import Path
 
 from mcp.server import MCPServer
 
@@ -63,16 +65,46 @@ def list_note_types() -> list[dict]:
 def add_notes(notes: list[dict]) -> list:
     """Add notes in bulk. Each note: {"deck": "Deck::Name", "notetype": "Basic", "fields": {"Front": "...", "Back": "..."}, "tags": ["a"]}.
     Fields may contain HTML. For cloze use notetype "Cloze" with {"Text": "{{c1::Berlin}} ist die Hauptstadt"}.
+    Images/audio: store them with add_media first, then use <img src="NAME"> or [sound:NAME] in a field.
+    A note whose first field already exists in a note of the same type is rejected as a duplicate (the error names
+    that note, so you can update it instead); set "allow_duplicate": true only if the user wants it twice.
     Unless the user turned it off, new notes wait in the app's inbox ("Eingang") until the user accepts them.
     Returns the new note id, or an error string, per note."""
     results = []
     for n in notes:
         try:
             results.append(call("add_note", notetype=n.get("notetype", "Basic"), deck=n["deck"], fields=n["fields"],
-                                tags=n.get("tags", []), inbox=True))
+                                tags=n.get("tags", []), inbox=True, allow_duplicate=bool(n.get("allow_duplicate"))))
         except Exception as e:
             results.append(f"error: {e}")
     return results
+
+
+@mcp.tool()
+def add_media(filename: str, path: str | None = None, url: str | None = None, data_base64: str | None = None) -> str:
+    """Store an image or audio file (e.g. a diagram from a PDF) in the collection's media folder.
+    Give exactly one source: an absolute local path, an http(s) URL, or base64 data. filename sets the name and extension.
+    Returns the stored file name (may differ if the name was taken); use it as <img src="NAME"> or [sound:NAME] in a field."""
+    if path:
+        if not Path(path).is_file():
+            raise ValueError(f"no such file: {path}")
+        data_base64 = base64.b64encode(Path(path).read_bytes()).decode()
+    elif url:
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("url must start with http:// or https://")
+        req = urllib.request.Request(url, headers={"User-Agent": "Muisti"})
+        data_base64 = base64.b64encode(urllib.request.urlopen(req, timeout=30).read()).decode()
+    if not data_base64:
+        raise ValueError("give path, url or data_base64")
+    return call("add_media", filename=filename, data_b64=data_base64)
+
+
+@mcp.tool()
+def current_card() -> dict | None:
+    """The card the user is studying in the app right now: fields, rendered question/answer text, deck, lapses.
+    Use it when the user says "this card" ("explain this", "make this card better"). null if they aren't studying.
+    Change it with update_note only after the user agrees; the study screen shows the new version right away."""
+    return call("current_card")
 
 
 @mcp.tool()

@@ -96,7 +96,11 @@
   }
 
   refresh()
-  ;/** @type {any} */ (window).__baRefresh = refresh // app.py calls this after Claude changed something
+  // app.py calls this after Claude changed something; an edited note may be the card being studied
+  ;/** @type {any} */ (window).__baRefresh = (method) => {
+    refresh()
+    if (method === 'update_note') window.dispatchEvent(new Event('ba-note-changed'))
+  }
   // Claude may add cards via MCP while the app is open; pick them up when the window regains focus.
   window.addEventListener('focus', () => view.name === 'today' && refresh())
 </script>

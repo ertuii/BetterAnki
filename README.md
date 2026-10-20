@@ -12,8 +12,8 @@ Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen �
 ## Funktionen
 
 - **Heute:** fällige Karten, Semesterstreifen (Lernverlauf + Prognose; Klick auf einen künftigen Tag lernt dessen Karten vor), Stapel mit Unterstapeln
-- **Lernen:** Tastatur (Leertaste, 1–4), Bearbeiten, Rückgängig, Zurückstellen, Audio, Vorlesen (`{{tts de_DE:Feld}}`)
-- **Hinzufügen / Browser:** Rich-Text-Felder, Lückentext, Suche mit Anki-Syntax, Filter nach Stapel und Status, Aussetzen, Markieren, Verschieben
+- **Lernen:** Tastatur (Leertaste, 1–4), Bearbeiten, Rückgängig, Zurückstellen, Audio, Vorlesen (`{{tts de_DE:Feld}}`), Formeln (`\(…\)`, `\[…\]` mit KaTeX), Antwort eintippen (`{{type:Feld}}`)
+- **Hinzufügen / Browser:** Rich-Text-Felder, Lückentext, Bild-Verdeckung (Bereiche auf einem Bild aufziehen), Hinweis auf Dubletten, Suche mit Anki-Syntax, Filter nach Stapel und Status, Aussetzen, Markieren, Verschieben
 - **Stapel-Optionen:** alle Optionen von Anki – Voreinstellungen, Tageslimits (auch nur für diesen Stapel / nur heute), Lernschritte, Lästlinge, Anzeigereihenfolge, Zurückstellen, Audio, Timer, Automatisch weiter, Leichte Tage, SM-2-Faktoren, **FSRS** inkl. Optimierung
 - **Gefilterte Stapel:** Karten per Suche zum Pauken sammeln
 - **Statistik:** Wiederholungen, Prognose, Kartenzahlen, Intervalle, Tageszeit, Erinnerung, Antworttasten
@@ -30,7 +30,7 @@ Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen �
 - **Lernplan:** Dauer wählen und über alle Stapel lernen, nahe Prüfungen zuerst
 - **Schwachstellen:** Themen und Stapel unter deinem Durchschnitt in der Statistik, mit „Üben“ für die vergessenen Karten
 
-Noch nicht: Bild-Verdeckung (Image Occlusion), Add-ons.
+Noch nicht: Add-ons.
 
 ## Starten (Entwicklung)
 
@@ -68,7 +68,7 @@ In der App: **Einstellungen → Claude verbinden → Verbinden** (für Claude De
 
 Läuft die App, schreibt Claude direkt in die offene Sammlung (neue Karten erscheinen sofort im Eingang). Ist sie geschlossen, öffnet der MCP-Server die Sammlung selbst.
 
-Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `review_statistics`, `create_filtered_deck`, `import_file`, `export_deck`, `list_inbox`, `difficult_cards`, `weak_spots`, `exam_plan`.
+Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes` (lehnt Dubletten ab), `add_media`, `current_card`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `review_statistics`, `create_filtered_deck`, `import_file`, `export_deck`, `list_inbox`, `difficult_cards`, `weak_spots`, `exam_plan`.
 
 Fertige Abläufe (MCP-Prompts): **Karten aus Material erstellen** (Skript, PDF oder Text → Karten, ohne Dubletten) und **Schwierige Karten verbessern** (oft vergessene Karten analysieren und nach deinem OK umformulieren).
 
