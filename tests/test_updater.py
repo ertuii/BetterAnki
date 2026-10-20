@@ -18,7 +18,7 @@ app_name = "BetterAnki" if sys.platform == "win32" else "BetterAnki.app"
 with zipfile.ZipFile(tmp / updater.ASSET, "w") as z:
     z.writestr(f"{app_name}/new.txt", "v9")
 
-releases = {"tag_name": "v9.0.0", "body": "Neu", "assets": [{"name": updater.ASSET, "browser_download_url": None}]}
+releases = {"version": "9.0.0", "assets": {}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -35,18 +35,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
 srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 base = f"http://127.0.0.1:{srv.server_port}"
-releases["assets"][0]["browser_download_url"] = f"{base}/{updater.ASSET}"
+releases["assets"][updater.ASSET] = f"{base}/{updater.ASSET}"
 
 assert updater._parse("v0.10.0") > updater._parse("0.9.3")
 assert updater.check() is None  # running from source, no override: never updates
 
 os.environ["BETTERANKI_UPDATE_URL"] = f"{base}/latest"
 u = updater.check()
-assert u and u["version"] == "9.0.0" and u["notes"] == "Neu", u
+assert u and u["version"] == "9.0.0", u
 
-releases["tag_name"] = "v" + updater.__version__
+releases["version"] = updater.__version__
 assert updater.check() is None  # same version: nothing to do
-releases["tag_name"] = "v9.0.0"
+releases["version"] = "9.0.0"
 
 swapped = {}
 updater.app_dir = lambda: tmp / "Applications" / app_name
@@ -55,6 +55,14 @@ updater.install(u)
 assert swapped["target"] == tmp / "Applications" / app_name
 assert (swapped["new"] / "new.txt").read_text() == "v9"
 assert swapped["new"].parent == tmp / "Applications" / ".BetterAnki-update"
+
+os.environ["BETTERANKI_UPDATE_URL"] = "http://127.0.0.1:1/latest"  # offline
+assert updater.check() is None
+try:
+    updater.check(manual=True)
+    raise AssertionError("manual check must report the error")
+except RuntimeError as e:
+    assert "fehlgeschlagen" in str(e)
 
 srv.shutdown()
 print("updater ok")

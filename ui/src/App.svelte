@@ -21,7 +21,7 @@
 
   const flat = $derived(flatten(decks))
 
-  const checkUpdate = () => api.check_update().then((u) => (update = u))
+  const checkUpdate = (manual = false) => api.check_update(manual).then((u) => (update = u))
   checkUpdate().catch(() => {})
 
   async function installUpdate() {

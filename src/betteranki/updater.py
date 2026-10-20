@@ -1,6 +1,6 @@
 """In-app updates from GitHub Releases: check, download, swap the app after it quits, restart.
 
-A release (see .github/workflows/build.yml) carries BetterAnki-macOS.zip and BetterAnki-Windows.zip.
+A release (see .github/workflows/build.yml) carries BetterAnki-macOS.zip, BetterAnki-Windows.zip and latest.json.
 """
 
 import json
@@ -34,20 +34,22 @@ def app_dir() -> Path:
     return exe.parent if sys.platform == "win32" else exe.parents[2]
 
 
-def check() -> dict | None:
-    """The newer release, or None if up to date, offline, or running from source."""
+def check(manual: bool = False) -> dict | None:
+    """The newer release, or None if up to date or running from source. Offline: None, or an error if manual."""
     url = os.environ.get("BETTERANKI_UPDATE_URL")  # for testing against a local fake release
     if not url and not getattr(sys, "frozen", False):
         return None
     try:
-        with _get(url or f"https://api.github.com/repos/{REPO}/releases/latest") as r:
+        # a release asset, not the GitHub API: the API allows only 60 anonymous requests per hour and IP
+        with _get(url or f"https://github.com/{REPO}/releases/latest/download/latest.json") as r:
             rel = json.load(r)
-    except (OSError, ValueError):
+    except (OSError, ValueError) as e:
+        if manual:
+            raise RuntimeError(f"Update-Suche fehlgeschlagen: {e}") from e
         return None
-    asset = next((a for a in rel.get("assets", []) if a.get("name") == ASSET), None)
-    if not asset or _parse(rel.get("tag_name", "")) <= _parse(__version__):
+    if ASSET not in rel.get("assets", {}) or _parse(rel.get("version", "")) <= _parse(__version__):
         return None
-    return {"version": rel["tag_name"].lstrip("v"), "notes": rel.get("body") or "", "url": asset["browser_download_url"]}
+    return {"version": rel["version"], "url": rel["assets"][ASSET]}
 
 
 def install(update: dict) -> None:

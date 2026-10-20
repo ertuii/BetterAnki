@@ -27,7 +27,7 @@
   async function lookForUpdate() {
     checking = true
     try {
-      const u = await checkUpdate()
+      const u = await checkUpdate(true)
       notify(u ? `Version ${u.version} ist verfügbar. Klicke links auf „Aktualisieren“.` : 'Du hast die neueste Version.')
     } catch (e) {
       fail(e)

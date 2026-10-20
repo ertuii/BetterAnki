@@ -1062,10 +1062,10 @@ class Core:
 
         return __version__
 
-    def check_update(self) -> dict | None:
+    def check_update(self, manual: bool = False) -> dict | None:
         from . import updater
 
-        return updater.check()
+        return updater.check(manual)
 
     def install_update(self) -> None:
         """Downloads the update, then quits; a helper swaps the app and starts it again."""
