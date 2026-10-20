@@ -5,7 +5,8 @@ from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp())
 os.environ["BETTERANKI_DIR"] = str(HOME / "data")
-os.environ["HOME"] = str(HOME)  # Claude Desktop/Code configs are looked up here, never the real ones
+# Claude Desktop/Code configs are looked up here, never the real ones (Windows: USERPROFILE, APPDATA)
+os.environ["HOME"] = os.environ["USERPROFILE"] = os.environ["APPDATA"] = str(HOME)
 
 from betteranki import claude_connect
 from betteranki.core import Core, collection_path, data_dir
@@ -36,7 +37,8 @@ def test_storage_import_claude():
     assert core.storage()["synced_folder"] is False
 
     # Claude Desktop: merges into an existing config and keeps other servers
-    desktop = HOME / "Library/Application Support/Claude/claude_desktop_config.json"
+    desktop = claude_connect._desktop_config()
+    assert desktop.is_relative_to(HOME)
     desktop.parent.mkdir(parents=True)
     desktop.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}, "preferences": {"a": 1}}))
     claude_connect.connect("desktop")

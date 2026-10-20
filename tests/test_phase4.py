@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 
 HOME = Path(tempfile.mkdtemp())
-os.environ["HOME"] = str(HOME)  # fake Anki desktop profile lives here
+os.environ["HOME"] = os.environ["USERPROFILE"] = os.environ["APPDATA"] = str(HOME)  # fake Anki desktop profile lives here
 os.environ["BETTERANKI_DIR"] = str(HOME / "data")
 
 from anki.collection import Collection
