@@ -1,0 +1,27 @@
+[project]
+name = "betteranki"
+version = "0.1.0"
+description = "Moderner Anki-Klon mit MCP-Server für Claude"
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [
+    { name = "arthur", email = "ar211sch@htwg-konstanz.de" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "anki>=26.9.3",
+    "mcp>=2.3.0",
+    "pywebview>=6.2.1",
+]
+
+[project.scripts]
+betteranki = "betteranki:main"
+
+[build-system]
+requires = ["uv_build>=0.13.3,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.22.3",
+]

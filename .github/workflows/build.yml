@@ -1,0 +1,20 @@
+name: build
+on: [workflow_dispatch, push]
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run python tests/test_core.py
+      - run: uv run python build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BetterAnki-${{ matrix.os }}
+          path: dist/
