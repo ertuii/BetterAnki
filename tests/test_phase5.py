@@ -79,8 +79,12 @@ n3 = core.add_note("Basic", "Bio", ["Kern", "DNA"], inbox=True)
 assert core.inbox_count() == 0 and col.get_card(col.card_ids_of_note(n3)[0]).queue == 0
 
 # reset a deck's progress (Anki's "Forget"), undoable
+d = col.decks.get(bio)
+d["newToday"] = [col.sched.today, 9999]  # today's new limit used up
+col.decks.save(d)
 assert core.reset_deck(bio) == len(col.decks.cids(bio, children=True))
 assert not col.find_cards('"deck:Bio" -is:new')
+assert next(x for x in core.decks() if x["id"] == bio)["new"] > 0  # reset cards are due again today
 assert col.get_card(cards["zelle"][0]).lapses == 0
 assert core.undo() and col.find_cards('"deck:Bio" -is:new')
 

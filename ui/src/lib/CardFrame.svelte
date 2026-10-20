@@ -4,7 +4,7 @@
   let { html, css, ord = 0, onkey = null, autoplay = true, hideAudio = false } = $props()
 
   let frame = $state()
-  const dark = matchMedia('(prefers-color-scheme: dark)').matches
+  const dark = document.documentElement.dataset.theme === 'dark'
 
   const srcdoc = $derived(`<!doctype html><html><head><meta charset="utf-8">
 <base href="${location.origin}/media/">
@@ -41,5 +41,5 @@
 
 <style>
   iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; }
-  @media (prefers-color-scheme: dark) { iframe { background: #222326; } }
+  :global(:root[data-theme='dark']) iframe { background: #222326; }
 </style>

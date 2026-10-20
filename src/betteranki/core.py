@@ -618,6 +618,16 @@ class Core:
         return {**self._FEATURES, **self._col.get_config("betteranki.features", {})}
 
     @_locked
+    def theme(self) -> str:
+        return self._col.get_config("betteranki.theme", "system")
+
+    @_locked
+    def set_theme(self, theme: str) -> None:
+        if theme not in ("system", "light", "dark"):
+            raise ValueError(theme)
+        self._col.set_config("betteranki.theme", theme)
+
+    @_locked
     def save_features(self, features: dict) -> None:
         self._col.set_config("betteranki.features", {k: bool(features[k]) for k in self._FEATURES if k in features})
 
@@ -894,6 +904,10 @@ class Core:
         (self._col.sched.suspend_cards if suspended else self._col.sched.unsuspend_cards)(card_ids)
 
     @_locked
+    def suspend_note(self, note_id: int) -> None:
+        self._col.sched.suspend_notes([note_id])
+
+    @_locked
     def flag(self, card_ids: list[int], flag: int) -> None:
         self._col.set_user_flag_for_cards(flag, card_ids)
 
@@ -905,8 +919,16 @@ class Core:
 
     @_locked
     def reset_deck(self, deck_id: int) -> int:
-        """Reset the study progress of a deck and its subdecks."""
-        return self.forget_cards(self._col.decks.cids(deck_id, children=True))
+        """Reset the study progress of a deck and its subdecks, including today's new/review counters,
+        otherwise the reset cards stay hidden behind today's already used daily limit."""
+        undo = self._col.add_custom_undo_entry("Lernstand zurücksetzen")  # one undo step for both
+        n = self.forget_cards(self._col.decks.cids(deck_id, children=True))
+        for did in [deck_id, *(i for _, i in self._col.decks.children(deck_id))]:
+            d = self._col.decks.get(did)
+            d["newToday"] = d["revToday"] = [self._col.sched.today, 0]
+            self._col.decks.save(d)
+        self._col.merge_undo_entries(undo)
+        return n
 
     @_locked
     def move_cards(self, card_ids: list[int], deck) -> None:

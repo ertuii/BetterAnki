@@ -2,6 +2,7 @@
   import { Copy } from '@lucide/svelte'
   import { api } from './api.js'
   import AnkiMigration from './AnkiMigration.svelte'
+  import { applyTheme } from './theme.js'
 
   let { notify, refresh, checkUpdate } = $props()
 
@@ -23,6 +24,19 @@
   let prefTimer
   let features = $state(null)
   let version = $state('')
+  let theme = $state('system')
+  api.theme().then((t) => (theme = t))
+  const THEMES = [{ v: 'system', label: 'Wie System' }, { v: 'light', label: 'Hell' }, { v: 'dark', label: 'Dunkel' }]
+
+  async function setTheme(t) {
+    theme = t
+    applyTheme(t)
+    try {
+      await api.set_theme(t)
+    } catch (e) {
+      fail(e)
+    }
+  }
 
   async function saveFeatures() {
     try {
@@ -224,6 +238,15 @@
 
 <div class="settings">
   <h1>Einstellungen</h1>
+
+  <section>
+    <h2>Darstellung</h2>
+    <div class="seg" role="radiogroup" aria-label="Farbschema">
+      {#each THEMES as t}
+        <button role="radio" aria-checked={theme === t.v} class:on={theme === t.v} onclick={() => setTheme(t.v)}>{t.label}</button>
+      {/each}
+    </div>
+  </section>
 
   {#if features}
     <section>
@@ -438,6 +461,9 @@
   .small { font-size: 13px !important; }
   .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .extras { display: flex; flex-direction: column; gap: 14px; }
+  .seg { display: inline-flex; align-self: flex-start; border: 1px solid var(--rule-2); border-radius: var(--radius); padding: 2px; }
+  .seg button { background: transparent; color: var(--ink-2); border: 0; height: 30px; padding: 0 12px; font-weight: 500; }
+  .seg button.on { background: var(--ink); color: var(--paper); }
   .extra { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
   .extra input { margin-top: 3px; }
   .extra span { display: flex; flex-direction: column; gap: 2px; max-width: 62ch; }

@@ -1,5 +1,5 @@
 <script>
-  import { ArrowLeft, Pencil, Undo2, FastForward } from '@lucide/svelte'
+  import { ArrowLeft, Pencil, Undo2, FastForward, Pause } from '@lucide/svelte'
   import { api } from './api.js'
   import Editor from './Editor.svelte'
   import CardFrame from './CardFrame.svelte'
@@ -113,6 +113,13 @@
     await next()
   }
 
+  // Anki: @ suspends the card, ! the whole note (all its cards)
+  async function suspend(note = false) {
+    await (note ? api.suspend_note(card.note_id) : api.suspend([card.card_id]))
+    notify(note ? 'Notiz ausgesetzt (im Browser wieder aktivierbar)' : 'Karte ausgesetzt (im Browser wieder aktivierbar)')
+    await next()
+  }
+
   function onKey(e) {
     if (editing) return
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') return e.preventDefault(), undo()
@@ -121,6 +128,8 @@
     if (e.key === 'a' || e.key === 'A') return toggleAuto()
     if (e.key === 'e') return (editing = true)
     if (e.key === '-') return bury()
+    if (e.key === '@') return suspend()
+    if (e.key === '!') return suspend(true)
     if (!revealed && (e.key === ' ' || e.key === 'Enter')) return e.preventDefault(), reveal()
     if (revealed && (e.key === ' ' || e.key === 'Enter')) return e.preventDefault(), answer(3)
     if (revealed && ['1', '2', '3', '4'].includes(e.key)) answer(Number(e.key))
@@ -156,6 +165,7 @@
         {#if card.study.seconds_question || card.study.seconds_answer}
           <button class="plain" class:active={autoAdvance} onclick={toggleAuto} title="Automatisch weiter (A)"><FastForward size={17} /></button>
         {/if}
+        <button class="plain" onclick={() => suspend()} title="Karte aussetzen (@), ganze Notiz: !"><Pause size={17} /></button>
         <button class="plain" onclick={undo} title="Rückgängig (⌘Z)"><Undo2 size={17} /></button>
         <button class="plain" onclick={() => (editing = true)} title="Bearbeiten (E)"><Pencil size={17} /></button>
       </div>

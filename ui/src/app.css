@@ -44,37 +44,36 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #17181b;
-    --paper-2: #1f2024;
-    --paper-3: #2a2b30;
-    --ink: #ecebe6;
-    --ink-2: #a9a69e;
-    --ink-3: #7d7a73;
-    --rule: #2f3035;
-    --rule-2: #44454b;
-    --m-red: #f0624f;
-    --m-blue: #6b9cf2;
-    --m-green: #45c07c;
-    --m-ochre: #f0b52a;
-    --m-violet: #a283ec;
-    --m-teal: #3cc1bb;
-    --m-pink: #ee70a6;
-    --s-new: #3987e5;
-    --s-young: #199e70;
-    --s-learn: #e66767;
-    --s-mature: #008300;
-    --s-relearn: #c98500;
-    --s-muted: #44454b;
-    --warn-bg: #3a2f12;
-    --warn-ink: #f2cf74;
-    --heat-1: #24344f;
-    --heat-2: #3b5ea0;
-    --heat-3: #6b9cf2;
-    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9a69e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    color-scheme: dark;
-  }
+/* dark: set by lib/theme.js (system, or the choice in Einstellungen) */
+:root[data-theme='dark'] {
+  --paper: #17181b;
+  --paper-2: #1f2024;
+  --paper-3: #2a2b30;
+  --ink: #ecebe6;
+  --ink-2: #a9a69e;
+  --ink-3: #7d7a73;
+  --rule: #2f3035;
+  --rule-2: #44454b;
+  --m-red: #f0624f;
+  --m-blue: #6b9cf2;
+  --m-green: #45c07c;
+  --m-ochre: #f0b52a;
+  --m-violet: #a283ec;
+  --m-teal: #3cc1bb;
+  --m-pink: #ee70a6;
+  --s-new: #3987e5;
+  --s-young: #199e70;
+  --s-learn: #e66767;
+  --s-mature: #008300;
+  --s-relearn: #c98500;
+  --s-muted: #44454b;
+  --warn-bg: #3a2f12;
+  --warn-ink: #f2cf74;
+  --heat-1: #24344f;
+  --heat-2: #3b5ea0;
+  --heat-3: #6b9cf2;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9a69e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
