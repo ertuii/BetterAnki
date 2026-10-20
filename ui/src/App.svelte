@@ -16,8 +16,23 @@
   let overview = $state(null)
   let toast = $state(null)
   let toastTimer
+  let update = $state(null)
+  let updating = $state(false)
 
   const flat = $derived(flatten(decks))
+
+  const checkUpdate = () => api.check_update().then((u) => (update = u))
+  checkUpdate().catch(() => {})
+
+  async function installUpdate() {
+    updating = true
+    try {
+      await api.install_update() // the app closes and restarts itself in the new version
+    } catch (e) {
+      updating = false
+      notify(String(e?.message ?? e), true)
+    }
+  }
 
   async function refresh() {
     ;[decks, overview] = await Promise.all([api.decks(), api.overview()])
@@ -93,6 +108,12 @@
         </button>
       {/each}
     </nav>
+    {#if update}
+      <div class="update" role="status">
+        <b>Version {update.version} ist da</b>
+        <button class="sm" disabled={updating} onclick={installUpdate}>{updating ? 'Lade Update …' : 'Aktualisieren'}</button>
+      </div>
+    {/if}
     <button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>
     <button class="nav foot" class:on={view.name === 'settings'} onclick={() => go('settings')}><Gear size={17} />Einstellungen</button>
     <button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>
@@ -110,7 +131,7 @@
     {:else if view.name === 'notetypes'}
       <NoteTypes {notify} />
     {:else if view.name === 'settings'}
-      <Settings {notify} {refresh} />
+      <Settings {notify} {refresh} {checkUpdate} />
     {:else if view.name === 'stats'}
       <Stats {flat} {notify} />
     {:else if view.name === 'options'}
@@ -159,6 +180,7 @@
   .decks { flex: 1; }
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .count { margin-left: auto; color: var(--ink-2); font-size: 13px; font-weight: 500; }
+  .update { margin: 8px 0 10px; padding: 12px; border-radius: var(--radius); background: var(--paper-2); display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
   .foot { color: var(--ink-2); }
   .foot.on { color: var(--ink); }
   main { overflow: auto; min-width: 0; }

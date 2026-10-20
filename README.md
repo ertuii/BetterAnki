@@ -37,6 +37,16 @@ uv run python build.py     # -> dist/BetterAnki.app (Mac) bzw. dist/BetterAnki/B
 ```
 PyInstaller baut nur für das System, auf dem es läuft. Die Windows-Version entsteht auf einem Windows-PC oder über GitHub Actions (`.github/workflows/build.yml`).
 
+## Updates ausrollen
+
+1. Version in `src/betteranki/__init__.py` und `pyproject.toml` erhöhen (z. B. `0.3.0`), committen.
+2. `git tag v0.3.0 && git push --tags`
+3. GitHub Actions baut Mac und Windows und veröffentlicht ein Release mit `BetterAnki-macOS.zip` und `BetterAnki-Windows.zip`.
+4. Installierte Apps sehen beim Start „Version 0.3.0 ist da“, ein Klick lädt, ersetzt und startet die App neu. Karten liegen getrennt und bleiben unberührt.
+
+Das Release muss ohne Anmeldung abrufbar sein, das Repo also öffentlich.
+Erste Installation bei Freunden (App ist nicht signiert): Mac – Rechtsklick auf die App → *Öffnen*; Windows – „Weitere Informationen“ → *Trotzdem ausführen*. Updates danach brauchen das nicht mehr.
+
 ## Claude anbinden (MCP)
 
 In der App: **Einstellungen → Claude verbinden → Verbinden** (für Claude Desktop und/oder Claude Code). Das war's; Claude Desktop danach einmal neu starten. Verschiebst du die App später, trägt sie den neuen Pfad beim nächsten Start selbst nach.

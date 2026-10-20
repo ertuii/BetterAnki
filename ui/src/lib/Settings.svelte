@@ -3,7 +3,7 @@
   import { api } from './api.js'
   import AnkiMigration from './AnkiMigration.svelte'
 
-  let { notify, refresh } = $props()
+  let { notify, refresh, checkUpdate } = $props()
 
   let account = $state(null)
   let user = $state('')
@@ -21,6 +21,20 @@
   let prefs = $state(null)
   let cardCount = $state(0)
   let prefTimer
+  let version = $state('')
+  let checking = $state(false)
+
+  async function lookForUpdate() {
+    checking = true
+    try {
+      const u = await checkUpdate()
+      notify(u ? `Version ${u.version} ist verfügbar. Klicke links auf „Aktualisieren“.` : 'Du hast die neueste Version.')
+    } catch (e) {
+      fail(e)
+    } finally {
+      checking = false
+    }
+  }
 
   async function load() {
     ;[account, backups, storage, claude, prefs, cardCount] = await Promise.all([
@@ -187,6 +201,7 @@
   ]
 
   load()
+  api.app_version().then((v) => (version = v))
 </script>
 
 <div class="settings">
@@ -367,6 +382,15 @@
         </div>
       {/if}
     {/if}
+  </section>
+
+  <section>
+    <h2>Version</h2>
+    <div class="row">
+      <span class="num">BetterAnki {version}</span>
+      <button class="ghost sm" disabled={checking} onclick={lookForUpdate}>{checking ? 'Suche …' : 'Nach Updates suchen'}</button>
+    </div>
+    <p class="muted small">Die App sucht beim Start selbst nach neuen Versionen. Deine Karten bleiben beim Update unberührt.</p>
   </section>
 </div>
 

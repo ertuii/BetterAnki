@@ -1055,6 +1055,28 @@ class Core:
 
         claude_connect.disconnect(target)
 
+    # ---------- updates ----------
+
+    def app_version(self) -> str:
+        from . import __version__
+
+        return __version__
+
+    def check_update(self) -> dict | None:
+        from . import updater
+
+        return updater.check()
+
+    def install_update(self) -> None:
+        """Downloads the update, then quits; a helper swaps the app and starts it again."""
+        from . import updater
+
+        update = updater.check()
+        if not update:
+            raise RuntimeError("Kein Update verfügbar.")
+        updater.install(update)
+        threading.Timer(0.3, self._window.destroy).start()
+
     # ---------- native dialogs (app only) ----------
 
     def pick_import_file(self) -> str | None:
