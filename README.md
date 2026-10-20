@@ -45,7 +45,7 @@ PyInstaller baut nur für das System, auf dem es läuft. Die Windows-Version ent
 4. Installierte Apps sehen beim Start „Version 0.3.0 ist da“, ein Klick lädt, ersetzt und startet die App neu. Karten liegen getrennt und bleiben unberührt.
 
 Das Release muss ohne Anmeldung abrufbar sein, das Repo also öffentlich.
-Erste Installation bei Freunden (App ist nicht signiert): Mac – Rechtsklick auf die App → *Öffnen*; Windows – „Weitere Informationen“ → *Trotzdem ausführen*. Updates danach brauchen das nicht mehr.
+Erste Installation bei Freunden (App ist nicht signiert): Mac – App einmal öffnen, dann *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen* (nur Apple-Silicon-Macs, der CI-Build ist arm64); Windows – „Weitere Informationen“ → *Trotzdem ausführen*. Updates danach brauchen das nicht mehr.
 
 ## Claude anbinden (MCP)
 
