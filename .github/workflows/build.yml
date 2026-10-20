@@ -28,6 +28,31 @@ jobs:
         working-directory: ui
       - run: uv run python build.py
       - if: runner.os == 'macOS'
+        run: dist/BetterAnki.app/Contents/MacOS/BetterAnki --selfcheck "$RUNNER_TEMP/selfcheck.txt" || { cat "$RUNNER_TEMP/selfcheck.txt"; exit 1; }
+      - if: runner.os == 'Windows'
+        name: Smoke test, also as if unzipped with Windows' own tool (every file marked as downloaded)
+        shell: pwsh
+        run: |
+          $app = (Resolve-Path dist/BetterAnki/BetterAnki.exe).Path
+          $log = "$env:RUNNER_TEMP\selfcheck.txt"
+          function Check($label) {
+            Remove-Item $log -ErrorAction SilentlyContinue
+            $p = Start-Process $app -ArgumentList "--selfcheck", $log -Wait -PassThru
+            Write-Host "$label -> exit $($p.ExitCode)"
+            if (Test-Path $log) { Get-Content $log | Write-Host }
+            return $p.ExitCode
+          }
+          $files = Get-ChildItem dist/BetterAnki -Recurse -File
+          if ((Check "plain") -ne 0) { exit 1 }
+          $files | ForEach-Object { Set-Content -LiteralPath $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
+          if ((Check "marked") -ne 0) { exit 1 }
+          # without the config the marked build has to fail, or this test proves nothing
+          Rename-Item dist/BetterAnki/BetterAnki.exe.config cfg.bak
+          $without = Check "marked, without BetterAnki.exe.config"
+          Rename-Item dist/BetterAnki/cfg.bak BetterAnki.exe.config
+          $files | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue }
+          if ($without -eq 0) { Write-Host "::warning::Mark of the Web did not reproduce on this runner" }
+      - if: runner.os == 'macOS'
         run: ditto -c -k --keepParent dist/BetterAnki.app ${{ matrix.zip }}
       - if: runner.os == 'Windows'
         run: Compress-Archive -Path dist/BetterAnki -DestinationPath ${{ matrix.zip }}

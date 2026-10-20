@@ -27,3 +27,12 @@ PyInstaller.__main__.run([
     "--osx-bundle-identifier", "app.betteranki",
     "--icon", str(ROOT / "assets" / ("icon.ico" if sys.platform == "win32" else "icon.icns")),
 ])
+
+if sys.platform == "win32":
+    # Windows' own unzip marks every file as downloaded ("Mark of the Web"), and .NET then refuses to load
+    # pythonnet's and WebView2's DLLs (0x80131515). This config next to the exe lifts that for our own folder.
+    (ROOT / "dist" / "BetterAnki" / "BetterAnki.exe.config").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        "<configuration><runtime><loadFromRemoteSources enabled=\"true\"/></runtime></configuration>\n",
+        encoding="utf-8",
+    )
