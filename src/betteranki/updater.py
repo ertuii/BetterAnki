@@ -88,8 +88,8 @@ def _rmtree(p: Path):
     shutil.rmtree(p, ignore_errors=True)
 
 
-def _start_swap(target: Path, new: Path, staging: Path):
-    pid = os.getpid()
+def _start_swap(target: Path, new: Path, staging: Path, pid: int | None = None):
+    pid = pid or os.getpid()  # the process to wait for (a stand-in in tests)
     old = target.with_name(target.name + ".old")
     script = Path(tempfile.mkdtemp()) / ("swap.ps1" if sys.platform == "win32" else "swap.sh")
     if sys.platform == "win32":

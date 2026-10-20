@@ -65,4 +65,31 @@ except RuntimeError as e:
     assert "fehlgeschlagen" in str(e)
 
 srv.shutdown()
+
+if sys.platform == "win32":
+    # The real swap on Windows, started the way the app starts it: from a process whose working directory is
+    # the app folder (double-click in Explorer). Windows can't rename a folder some process is standing in.
+    import subprocess
+    import time
+
+    import importlib
+
+    importlib.reload(updater)  # undo the stubs above
+    app = tmp / "Programs" / "BetterAnki"
+    app.mkdir(parents=True)
+    (app / "old.txt").write_text("v1")
+    staging = app.parent / ".BetterAnki-update"
+    (staging / "BetterAnki").mkdir(parents=True)
+    (staging / "BetterAnki" / "new.txt").write_text("v2")
+    fake_app = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(2)"])
+    os.chdir(app)
+    updater._start_swap(app, staging / "BetterAnki", staging, pid=fake_app.pid)
+    os.chdir(tmp)
+    fake_app.wait()
+    for _ in range(60):
+        if (app / "new.txt").exists() and not staging.exists():
+            break
+        time.sleep(0.5)
+    assert (app / "new.txt").exists() and not (app / "old.txt").exists(), sorted(p.name for p in app.parent.iterdir())
+
 print("updater ok")
