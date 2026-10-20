@@ -5,11 +5,11 @@
   let { deckId, notify, onBack } = $props()
 
   let o = $state(null)
-  let learnSteps = $state('')
-  let relearnSteps = $state('')
+  let steps = $state({ learn_steps: '', relearn_steps: '' })
   let saving = $state(false)
   let optimizing = $state(false)
   let newPreset = $state(null)
+  let reschedule = $state(false)
 
   // Anki stores steps in minutes; show them as "1m 10m 1d".
   const fmtSteps = (xs) => xs.map((m) => (m >= 1440 && m % 1440 === 0 ? `${m / 1440}d` : m >= 60 && m % 60 === 0 ? `${m / 60}h` : `${m}m`)).join(' ')
@@ -22,16 +22,78 @@
     })
   }
 
+  const SM2 = (x) => !x.fsrs
+  const FSRS = (x) => x.fsrs
+  const WEEKDAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag']
+
+  // Every option of an Anki preset, grouped like Anki's own options screen.
+  const SECTIONS = [
+    { title: 'Neue Karten', fields: [
+      { k: 'learn_steps', label: 'Lernschritte', kind: 'steps', help: 'Abstände beim ersten Lernen, z. B. 1m 10m 1d.' },
+      { k: 'graduating_interval_good', label: 'Abschlussintervall (Tage)', kind: 'int', show: SM2 },
+      { k: 'graduating_interval_easy', label: 'Intervall bei „Einfach“ (Tage)', kind: 'int', show: SM2 },
+      { k: 'new_card_insert_order', label: 'Einfügereihenfolge', kind: 'enum', opts: ['Nacheinander (älteste zuerst)', 'Zufällig'] },
+    ] },
+    { title: 'Vergessene Karten', fields: [
+      { k: 'relearn_steps', label: 'Neulernschritte', kind: 'steps' },
+      { k: 'minimum_lapse_interval', label: 'Minimales Intervall (Tage)', kind: 'int', show: SM2 },
+      { k: 'leech_threshold', label: 'Lästling ab Fehlversuchen', kind: 'int' },
+      { k: 'leech_action', label: 'Bei Lästlingen', kind: 'enum', opts: ['Karte aussetzen', 'Nur Tag „leech“ setzen'] },
+    ] },
+    { title: 'Anzeigereihenfolge', fields: [
+      { k: 'new_card_gather_priority', label: 'Neue Karten sammeln', kind: 'enum',
+        opts: ['Stapel', 'Stapel, dann zufällige Notizen', 'Aufsteigende Position', 'Absteigende Position', 'Zufällige Notizen', 'Zufällige Karten'] },
+      { k: 'new_card_sort_order', label: 'Neue Karten sortieren', kind: 'enum',
+        opts: ['Kartentyp, dann Sammelreihenfolge', 'Sammelreihenfolge', 'Kartentyp, dann zufällig', 'Zufällige Notiz, dann Kartentyp', 'Zufällig'] },
+      { k: 'new_mix', label: 'Neue Karten / Wiederholungen', kind: 'enum', opts: ['Gemischt', 'Neue nach Wiederholungen', 'Neue vor Wiederholungen'] },
+      { k: 'interday_learning_mix', label: 'Lernkarten (über Tage) / Wiederholungen', kind: 'enum', opts: ['Gemischt', 'Lernkarten danach', 'Lernkarten davor'] },
+      { k: 'review_order', label: 'Wiederholungen sortieren', kind: 'enum',
+        opts: ['Fälligkeit, dann zufällig', 'Fälligkeit, dann Stapel', 'Stapel, dann Fälligkeit', 'Aufsteigende Intervalle', 'Absteigende Intervalle',
+          'Aufsteigende Leichtigkeit', 'Absteigende Leichtigkeit', 'Abrufbarkeit aufsteigend', 'Abrufbarkeit absteigend', 'Relative Überfälligkeit',
+          'Zufällig', 'Reihenfolge des Hinzufügens', 'Umgekehrte Reihenfolge des Hinzufügens'] },
+    ] },
+    { title: 'Zurückstellen', help: 'Verwandte Karten derselben Notiz erst am nächsten Tag zeigen.', fields: [
+      { k: 'bury_new', label: 'Neue verwandte Karten zurückstellen', kind: 'bool' },
+      { k: 'bury_reviews', label: 'Verwandte Wiederholungen zurückstellen', kind: 'bool' },
+      { k: 'bury_interday_learning', label: 'Verwandte Lernkarten (über Tage) zurückstellen', kind: 'bool' },
+    ] },
+    { title: 'Audio', fields: [
+      { k: 'disable_autoplay', label: 'Audio nicht automatisch abspielen', kind: 'bool' },
+    ] },
+    { title: 'Timer', fields: [
+      { k: 'cap_answer_time_to_secs', label: 'Maximale Antwortzeit (Sekunden)', kind: 'int', help: 'Längere Antworten zählen in der Statistik nur so lang.' },
+      { k: 'show_timer', label: 'Timer beim Lernen anzeigen', kind: 'bool' },
+      { k: 'stop_timer_on_answer', label: 'Timer beim Aufdecken anhalten', kind: 'bool' },
+    ] },
+    { title: 'Automatisch weiter', help: 'Beim Lernen mit A ein- und ausschalten.', fields: [
+      { k: 'seconds_to_show_question', label: 'Frage zeigen für (Sekunden, 0 = aus)', kind: 'float' },
+      { k: 'question_action', label: 'Danach', kind: 'enum', opts: ['Antwort zeigen', 'Nur erinnern'] },
+      { k: 'seconds_to_show_answer', label: 'Antwort zeigen für (Sekunden, 0 = aus)', kind: 'float' },
+      { k: 'answer_action', label: 'Danach', kind: 'enum', opts: ['Karte zurückstellen', 'Mit „Nochmal“ bewerten', 'Mit „Gut“ bewerten', 'Mit „Schwer“ bewerten', 'Nur erinnern'] },
+    ] },
+    { title: 'Erweitert', fields: [
+      { k: 'maximum_review_interval', label: 'Maximales Intervall (Tage)', kind: 'int' },
+      { k: 'new_per_day_minimum', label: 'Neue Karten pro Tag mindestens', kind: 'int', help: 'Auch wenn das Wiederholungslimit erreicht ist.' },
+      { k: 'initial_ease', label: 'Anfangs-Leichtigkeit', kind: 'float', show: SM2 },
+      { k: 'easy_multiplier', label: 'Bonus für „Einfach“', kind: 'float', show: SM2 },
+      { k: 'interval_multiplier', label: 'Intervall-Faktor', kind: 'float', show: SM2 },
+      { k: 'hard_multiplier', label: 'Intervall bei „Schwer“', kind: 'float', show: SM2 },
+      { k: 'lapse_multiplier', label: 'Neues Intervall nach Fehler', kind: 'float', show: SM2 },
+      { k: 'historical_retention', label: 'Frühere Erinnerung (für fehlende Historie)', kind: 'float', show: FSRS },
+      { k: 'ignore_revlogs_before_date', label: 'Verlauf vor Datum ignorieren', kind: 'date', show: FSRS },
+      { k: 'param_search', label: 'Suche für die Optimierung', kind: 'text', show: FSRS, help: 'Leer = alle Karten dieser Voreinstellung.' },
+    ] },
+  ]
+
   async function load(presetId) {
     o = await api.deck_options(deckId, presetId ?? null)
-    learnSteps = fmtSteps(o.learn_steps)
-    relearnSteps = fmtSteps(o.relearn_steps)
+    steps = { learn_steps: fmtSteps(o.learn_steps), relearn_steps: fmtSteps(o.relearn_steps) }
   }
 
   async function save() {
     saving = true
     try {
-      const data = { ...$state.snapshot(o), learn_steps: parseSteps(learnSteps), relearn_steps: parseSteps(relearnSteps) }
+      const data = { ...$state.snapshot(o), learn_steps: parseSteps(steps.learn_steps), relearn_steps: parseSteps(steps.relearn_steps), fsrs_reschedule: reschedule }
       await api.save_deck_options(deckId, data)
       notify('Optionen gespeichert')
       await load()
@@ -69,8 +131,36 @@
     }
   }
 
+  // Deck-only limits: empty = use the preset's value.
+  const limitInput = (k) => (e) => (o.limits[k] = e.currentTarget.value === '' ? null : Number(e.currentTarget.value))
+
   load()
 </script>
+
+{#snippet field(f)}
+  {#if !f.show || f.show(o)}
+    {#if f.kind === 'bool'}
+      <label class="check"><input type="checkbox" bind:checked={o[f.k]} />{f.label}</label>
+    {:else}
+      <label>{f.label}
+        {#if f.kind === 'steps'}
+          <input bind:value={steps[f.k]} placeholder="1m 10m" />
+        {:else if f.kind === 'enum'}
+          <select bind:value={o[f.k]}>{#each f.opts as label, i}<option value={i}>{label}</option>{/each}</select>
+        {:else if f.kind === 'int'}
+          <input type="number" min="0" step="1" bind:value={o[f.k]} />
+        {:else if f.kind === 'float'}
+          <input type="number" min="0" step="0.05" bind:value={o[f.k]} />
+        {:else if f.kind === 'date'}
+          <input type="date" bind:value={o[f.k]} />
+        {:else}
+          <input bind:value={o[f.k]} />
+        {/if}
+        {#if f.help}<small>{f.help}</small>{/if}
+      </label>
+    {/if}
+  {/if}
+{/snippet}
 
 <div class="opts">
   <header>
@@ -101,45 +191,20 @@
       <div class="fields">
         <label>Neue Karten pro Tag<input type="number" min="0" bind:value={o.new_per_day} /></label>
         <label>Wiederholungen pro Tag<input type="number" min="0" bind:value={o.reviews_per_day} /></label>
+        <label>Nur dieser Stapel: neue Karten<input type="number" min="0" placeholder="wie Voreinstellung" value={o.limits.new ?? ''} oninput={limitInput('new')} /></label>
+        <label>Nur dieser Stapel: Wiederholungen<input type="number" min="0" placeholder="wie Voreinstellung" value={o.limits.review ?? ''} oninput={limitInput('review')} /></label>
+        <label>Nur heute: neue Karten<input type="number" min="0" placeholder="wie sonst" value={o.limits.new_today ?? ''} oninput={limitInput('new_today')} /></label>
+        <label>Nur heute: Wiederholungen<input type="number" min="0" placeholder="wie sonst" value={o.limits.review_today ?? ''} oninput={limitInput('review_today')} /></label>
       </div>
-    </section>
-
-    <section>
-      <h2>Neue Karten</h2>
-      <div class="fields">
-        <label>Lernschritte<input bind:value={learnSteps} placeholder="1m 10m" /><small>z. B. 1m 10m 1d</small></label>
-        <label>Abschlussintervall (Tage)<input type="number" min="1" bind:value={o.graduating_interval_good} /></label>
-        <label>Intervall bei „Einfach“ (Tage)<input type="number" min="1" bind:value={o.graduating_interval_easy} /></label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Vergessene Karten</h2>
-      <div class="fields">
-        <label>Neulernschritte<input bind:value={relearnSteps} placeholder="10m" /></label>
-        <label>Lästling ab Fehlversuchen<input type="number" min="1" bind:value={o.leech_threshold} /></label>
-        <label>Bei Lästlingen
-          <select bind:value={o.leech_action}>
-            <option value={1}>Nur markieren</option>
-            <option value={0}>Aussetzen</option>
-          </select>
-        </label>
-      </div>
-    </section>
-
-    <section>
-      <h2>Zurückstellen</h2>
-      <p class="muted">Verwandte Karten derselben Notiz erst am nächsten Tag zeigen.</p>
       <div class="checks">
-        <label class="check"><input type="checkbox" bind:checked={o.bury_new} />Neue verwandte Karten</label>
-        <label class="check"><input type="checkbox" bind:checked={o.bury_reviews} />Verwandte Wiederholungen</label>
-        <label class="check"><input type="checkbox" bind:checked={o.bury_interday_learning} />Verwandte Lernkarten (über Tage)</label>
+        <label class="check"><input type="checkbox" bind:checked={o.new_cards_ignore_review_limit} />Neue Karten ignorieren das Wiederholungslimit <span class="muted">(alle Stapel)</span></label>
+        <label class="check"><input type="checkbox" bind:checked={o.apply_all_parent_limits} />Limits aller übergeordneten Stapel anwenden <span class="muted">(alle Stapel)</span></label>
       </div>
     </section>
 
     <section>
       <h2>Planung</h2>
-      <label class="check"><input type="checkbox" bind:checked={o.fsrs} />FSRS verwenden <span class="muted">(gilt für alle Stapel)</span></label>
+      <label class="check"><input type="checkbox" bind:checked={o.fsrs} />FSRS verwenden <span class="muted">(alle Stapel)</span></label>
       <p class="muted">FSRS plant Wiederholungen aus deinem Lernverlauf statt mit festen Faktoren und braucht meist weniger Wiederholungen für dieselbe Erinnerung.</p>
       {#if o.fsrs}
         <div class="fields">
@@ -153,11 +218,38 @@
             <small>{o.fsrs_optimized ? 'Angepasst an deinen Verlauf.' : 'Noch Standardwerte.'}</small>
           </div>
         </div>
+        <label class="check"><input type="checkbox" bind:checked={reschedule} />Karten beim Speichern neu planen <span class="muted">(nach Änderungen an FSRS)</span></label>
       {/if}
-      <div class="fields">
-        <label>Maximales Intervall (Tage)<input type="number" min="1" bind:value={o.maximum_review_interval} /></label>
-      </div>
     </section>
+
+    {#each SECTIONS as sec}
+      <section>
+        <h2>{sec.title}</h2>
+        {#if sec.help}<p class="muted">{sec.help}</p>{/if}
+        <div class="fields">
+          {#each sec.fields.filter((f) => f.kind !== 'bool') as f}{@render field(f)}{/each}
+        </div>
+        {#if sec.fields.some((f) => f.kind === 'bool')}
+          <div class="checks">{#each sec.fields.filter((f) => f.kind === 'bool') as f}{@render field(f)}{/each}</div>
+        {/if}
+      </section>
+    {/each}
+
+    {#if o.fsrs}
+      <section>
+        <h2>Leichte Tage</h2>
+        <p class="muted">An diesen Tagen plant FSRS weniger Wiederholungen ein.</p>
+        <div class="fields">
+          {#each WEEKDAYS as day, i}
+            <label>{day}
+              <select bind:value={o.easy_days_percentages[i]}>
+                <option value={1}>Normal</option><option value={0.5}>Weniger</option><option value={0}>Möglichst keine</option>
+              </select>
+            </label>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <div class="bar">
       <button class="ghost" onclick={onBack}>Abbrechen</button>
@@ -167,15 +259,15 @@
 </div>
 
 <style>
-  .opts { padding: 20px 40px 56px; max-width: 820px; display: flex; flex-direction: column; gap: 28px; }
+  .opts { padding: 20px 40px 0; max-width: 860px; display: flex; flex-direction: column; gap: 28px; }
   header { margin-left: -8px; }
   h1 { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; }
-  section { display: flex; flex-direction: column; gap: 10px; padding-top: 20px; border-top: 1px solid var(--rule); }
+  section { display: flex; flex-direction: column; gap: 12px; padding-top: 20px; border-top: 1px solid var(--rule); }
   h2 { font-size: 16px; font-weight: 700; }
   section > p { font-size: 13px; max-width: 65ch; }
   .row { display: flex; gap: 8px; }
   .row select { width: 280px; }
-  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
   label, .opt { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-2); }
   .lbl { font-size: 13px; }
   small { font-size: 12px; color: var(--ink-3); }

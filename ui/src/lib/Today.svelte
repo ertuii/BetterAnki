@@ -2,8 +2,9 @@
   import { ChevronRight, Ellipsis } from '@lucide/svelte'
   import { api, hueFor, total } from './api.js'
   import Strip from './Strip.svelte'
+  import AnkiMigration from './AnkiMigration.svelte'
 
-  let { decks, flat, overview, run, notify, onStudy, onAdd, onOptions } = $props()
+  let { decks, flat, overview, run, notify, onStudy, onAdd, onOptions, onPrelearn } = $props()
 
   let menuFor = $state(null)
   let renaming = $state(null)
@@ -12,6 +13,8 @@
   let newName = $state('')
   let confirmDelete = $state(null)
   let filtered = $state(null) // form state for a new filtered deck
+  let empty = $state(false) // no cards yet: offer to bring them over from Anki
+  api.stats().then((s) => (empty = s.cards === 0))
 
   const ORDERS = [
     [1, 'Zufällig'], [6, 'Nach Fälligkeit'], [8, 'Am stärksten überfällig'], [2, 'Kleinstes Intervall zuerst'],
@@ -100,8 +103,16 @@
     </div>
   </header>
 
+  {#if empty}
+    <section class="welcome">
+      <h2>Schon Karten in Anki?</h2>
+      <p class="muted">Übernimm deine Sammlung mit Lernstand. Oder ziehe eine .apkg- oder .colpkg-Datei ins Fenster, bzw. bitte Claude, Karten zu erstellen.</p>
+      <AnkiMigration {notify} compact onDone={() => { empty = false; run(async () => {}) }} />
+    </section>
+  {/if}
+
   {#if overview}
-    <Strip past={overview.past} future={overview.future} />
+    <Strip past={overview.past} future={overview.future} {onPrelearn} />
   {/if}
 
   <section>
@@ -228,6 +239,9 @@
   .menu .del { color: var(--m-red); }
   .empty { text-align: left; color: var(--ink-2); padding: 32px 12px; }
   .new-deck { padding-top: 16px; display: flex; gap: 8px; }
+  .welcome { border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; max-width: 860px; }
+  .welcome h2 { font-size: 16px; font-weight: 700; }
+  .welcome p { font-size: 14px; }
   .filtered { margin-top: 20px; padding: 20px; border: 1px solid var(--rule); border-radius: 12px; display: flex; flex-direction: column; gap: 12px; max-width: 860px; }
   .filtered h2 { font-size: 16px; font-weight: 700; }
   .filtered p { font-size: 13px; }

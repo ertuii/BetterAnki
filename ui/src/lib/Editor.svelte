@@ -69,6 +69,43 @@
     document.execCommand('insertText', false, `{{c${n}::${text}}}`)
   }
 
+  let pasteStrips = false
+  api.preferences().then((p) => (pasteStrips = p.editing.paste_strips_formatting))
+
+  // Images (pasted or dropped) go into the collection's media folder like in Anki.
+  async function insertFiles(files) {
+    for (const f of files) {
+      if (!f.type.startsWith('image/') && !f.type.startsWith('audio/')) continue
+      const b64 = await new Promise((res) => {
+        const r = new FileReader()
+        r.onload = () => res(String(r.result).split(',')[1])
+        r.readAsDataURL(f)
+      })
+      const name = await api.add_media(f.name || `bild-${Date.now()}.png`, b64)
+      const html = f.type.startsWith('image/') ? `<img src="${name}">` : `[sound:${name}]`
+      document.execCommand('insertHTML', false, html)
+    }
+  }
+
+  function onPaste(e) {
+    const files = [...(e.clipboardData?.files ?? [])]
+    if (files.length) {
+      e.preventDefault()
+      insertFiles(files)
+    } else if (pasteStrips) {
+      e.preventDefault()
+      document.execCommand('insertText', false, e.clipboardData.getData('text/plain'))
+    }
+  }
+
+  function onDrop(e) {
+    const files = [...(e.dataTransfer?.files ?? [])]
+    if (!files.length) return
+    e.preventDefault()
+    e.stopPropagation() // not an import: keep it away from the window-level drop handler
+    insertFiles(files)
+  }
+
   function onKey(e) {
     const mod = e.metaKey || e.ctrlKey
     if (mod && e.key === 'Enter') return e.preventDefault(), save()
@@ -97,7 +134,7 @@
     <div class="field">
       <span class="fname">{name}</span>
       <div class="rich" contenteditable="true" role="textbox" aria-multiline="true" aria-label={name} tabindex="0"
-        bind:this={editors[i]} bind:innerHTML={fields[name]} onkeydown={onKey}></div>
+        bind:this={editors[i]} bind:innerHTML={fields[name]} onkeydown={onKey} onpaste={onPaste} ondrop={onDrop}></div>
     </div>
   {/each}
 

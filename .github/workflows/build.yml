@@ -15,6 +15,7 @@ jobs:
       - run: uv run python tests/test_core.py
       - run: uv run python tests/test_phase2.py
       - run: uv run python tests/test_phase3.py
+      - run: uv run python tests/test_phase4.py
       - run: npm ci && npm run check
         working-directory: ui
       - run: uv run python build.py

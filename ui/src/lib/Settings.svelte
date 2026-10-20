@@ -1,6 +1,7 @@
 <script>
   import { Copy } from '@lucide/svelte'
   import { api } from './api.js'
+  import AnkiMigration from './AnkiMigration.svelte'
 
   let { notify, refresh } = $props()
 
@@ -17,9 +18,27 @@
   let moving = $state(false)
   let claude = $state(null)
   let connecting = $state(null)
+  let prefs = $state(null)
+  let cardCount = $state(0)
+  let prefTimer
 
   async function load() {
-    ;[account, backups, storage, claude] = await Promise.all([api.sync_account(), api.backups(), api.storage(), api.claude_status()])
+    ;[account, backups, storage, claude, prefs, cardCount] = await Promise.all([
+      api.sync_account(), api.backups(), api.storage(), api.claude_status(), api.preferences(), api.stats().then((s) => s.cards),
+    ])
+  }
+
+  // Preferences save themselves shortly after each change.
+  function savePrefs() {
+    clearTimeout(prefTimer)
+    prefTimer = setTimeout(async () => {
+      try {
+        await api.save_preferences($state.snapshot(prefs))
+        notify('Einstellung gespeichert')
+      } catch (e) {
+        fail(e)
+      }
+    }, 400)
   }
 
   async function chooseFolder() {
@@ -174,6 +193,52 @@
   <h1>Einstellungen</h1>
 
   <section>
+    <h2>Von Anki übernehmen</h2>
+    <p class="muted">Bringt deine Anki-Sammlung mit Lernstand in BetterAnki. Anki vorher schließen.</p>
+    <AnkiMigration {notify} hasCards={cardCount > 0} onDone={async () => { await refresh(); await load() }} />
+  </section>
+
+  {#if prefs}
+    <section oninput={savePrefs} onchange={savePrefs}>
+      <h2>Lernen</h2>
+      <div class="fields">
+        <label>Neuer Tag beginnt um
+          <select bind:value={prefs.scheduling.rollover}>{#each Array(24) as _, h}<option value={h}>{h}:00 Uhr</option>{/each}</select>
+        </label>
+        <label>Vorauslernen bis (Minuten)
+          <input type="number" min="0" value={Math.round(prefs.scheduling.learn_ahead_secs / 60)}
+            oninput={(e) => (prefs.scheduling.learn_ahead_secs = Number(e.currentTarget.value) * 60)} />
+          <small>Lernkarten, die bald fällig werden, schon vorher zeigen.</small>
+        </label>
+        <label>Zeitlimit pro Sitzung (Minuten, 0 = aus)
+          <input type="number" min="0" value={Math.round(prefs.reviewing.time_limit_secs / 60)}
+            oninput={(e) => (prefs.reviewing.time_limit_secs = Number(e.currentTarget.value) * 60)} />
+        </label>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" bind:checked={prefs.scheduling.day_learn_first} />Lernkarten (über Tage) vor Wiederholungen zeigen</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.reviewing.show_remaining_due_counts} />Verbleibende Karten beim Lernen anzeigen</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.reviewing.show_intervals_on_buttons} />Nächstes Intervall über den Antworttasten anzeigen</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.reviewing.hide_audio_play_buttons} />Wiedergabeknöpfe auf Karten ausblenden</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.reviewing.load_balancer_enabled} />Wiederholungen gleichmäßig auf Tage verteilen (Lastverteilung)</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.reviewing.fsrs_short_term_with_steps_enabled} />FSRS auch für Lernschritte am selben Tag nutzen</label>
+      </div>
+    </section>
+
+    <section oninput={savePrefs} onchange={savePrefs}>
+      <h2>Editor und Suche</h2>
+      <div class="fields">
+        <label>Standardsuche im Browser<input bind:value={prefs.editing.default_search_text} placeholder="z. B. is:due" /></label>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" bind:checked={prefs.editing.adding_defaults_to_current_deck} />Beim Hinzufügen den zuletzt benutzten Stapel vorschlagen</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.editing.paste_strips_formatting} />Formatierung beim Einfügen entfernen</label>
+        <label class="check"><input type="checkbox" bind:checked={prefs.editing.ignore_accents_in_search} />Akzente bei der Suche ignorieren (é = e)</label>
+      </div>
+    </section>
+  {/if}
+
+  <section>
     <h2>AnkiWeb-Synchronisierung</h2>
     <p class="muted">Optional. Hält diese Sammlung mit AnkiWeb und der Anki-App auf dem Handy abgeglichen. Ohne Anmeldung bleibt alles nur auf diesem Laptop.</p>
     {#if account}
@@ -204,7 +269,15 @@
 
   <section>
     <h2>Sicherungen</h2>
-    <p class="muted">Beim Beenden sichert BetterAnki automatisch (höchstens alle 30 Minuten). Vor jedem Wiederherstellen wird der aktuelle Stand zusätzlich gesichert.</p>
+    <p class="muted">Beim Beenden sichert BetterAnki automatisch. Vor jedem Wiederherstellen und jeder Übernahme wird der aktuelle Stand zusätzlich gesichert.</p>
+    {#if prefs}
+      <div class="fields" oninput={savePrefs} onchange={savePrefs}>
+        <label>Höchstens alle (Minuten)<input type="number" min="5" bind:value={prefs.backups.minimum_interval_mins} /></label>
+        <label>Tägliche behalten<input type="number" min="0" bind:value={prefs.backups.daily} /></label>
+        <label>Wöchentliche behalten<input type="number" min="0" bind:value={prefs.backups.weekly} /></label>
+        <label>Monatliche behalten<input type="number" min="0" bind:value={prefs.backups.monthly} /></label>
+      </div>
+    {/if}
     <div class="row">
       <button class="ghost" disabled={backingUp} onclick={backupNow}>{backingUp ? 'Sichere …' : 'Jetzt sichern'}</button>
       <button class="ghost" onclick={exportAll}>Ganze Sammlung exportieren (.colpkg)</button>
@@ -313,6 +386,11 @@
   .cmd { display: flex; align-items: center; gap: 8px; background: var(--paper-2); border-radius: var(--radius); padding: 8px 8px 8px 12px; }
   .cmd code { flex: 1; font: 13px/1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; overflow-wrap: anywhere; }
   .w { width: 1%; white-space: nowrap; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .fields label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-2); }
+  .fields small { font-size: 12px; color: var(--ink-3); }
+  .checks { display: flex; flex-direction: column; gap: 8px; }
+  label.check { display: flex; align-items: center; gap: 10px; font-size: 14px; }
   .clients { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
   .clients li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
   .clients li:last-child { border-bottom: 0; }

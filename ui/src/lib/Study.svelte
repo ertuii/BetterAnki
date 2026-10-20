@@ -1,16 +1,56 @@
 <script>
-  import { ArrowLeft, Pencil, Undo2 } from '@lucide/svelte'
+  import { ArrowLeft, Pencil, Undo2, FastForward } from '@lucide/svelte'
   import { api } from './api.js'
   import Editor from './Editor.svelte'
   import CardFrame from './CardFrame.svelte'
 
-  let { deckId, deckName, flat, notify, onExit } = $props()
+  // temporary: a pre-learn deck from the timeline, removed again when the session ends
+  let { deckId, deckName, flat, notify, onExit, temporary = false } = $props()
 
   let card = $state(null)
   let done = $state(false)
   let revealed = $state(false)
   let editing = $state(false)
   let busy = false
+  let prefs = $state({ show_remaining_due_counts: true, show_intervals_on_buttons: true, time_limit_secs: 0, hide_audio_play_buttons: false })
+  let elapsed = $state(0) // seconds the current card has been shown
+  let shownAt = Date.now()
+  let autoAdvance = $state(false)
+  let advanceTimer
+  let boxStart = Date.now()
+  let boxCount = 0
+
+  api.preferences().then((p) => (prefs = p.reviewing))
+
+  const tick = setInterval(() => {
+    if (!card || (revealed && card.study.stop_timer_on_answer)) return
+    elapsed = Math.min(card.study.cap_secs, Math.floor((Date.now() - shownAt) / 1000))
+  }, 1000)
+  $effect(() => () => {
+    clearInterval(tick)
+    clearTimeout(advanceTimer)
+  })
+  const clock = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+
+  // Anki's "auto advance": toggled with A, timings and actions come from the deck's preset.
+  $effect(() => {
+    clearTimeout(advanceTimer)
+    if (!autoAdvance || !card) return
+    const st = card.study
+    // ponytail: wait_for_audio is ignored, the timer starts when the card is shown
+    if (!revealed && st.seconds_question > 0) {
+      advanceTimer = setTimeout(() => (st.question_action === 0 ? reveal() : notify('Zeit, die Antwort aufzudecken')), st.seconds_question * 1000)
+    } else if (revealed && st.seconds_answer > 0) {
+      const act = [() => bury(), () => answer(1), () => answer(3), () => answer(2), () => notify('Zeit, die Karte zu bewerten')][st.answer_action]
+      advanceTimer = setTimeout(act, st.seconds_answer * 1000)
+    }
+  })
+
+  async function exit() {
+    clearTimeout(advanceTimer)
+    if (temporary) await api.end_prelearn(deckId)
+    onExit()
+  }
 
   const BUTTONS = [
     { ease: 1, label: 'Nochmal', cls: 'again' },
@@ -23,6 +63,8 @@
     card = await api.next_card(deckId)
     revealed = false
     done = !card
+    shownAt = Date.now()
+    elapsed = 0
   }
 
   function reveal() {
@@ -34,6 +76,12 @@
     busy = true
     try {
       await api.answer(card.card_id, ease)
+      boxCount++
+      if (prefs.time_limit_secs && Date.now() - boxStart >= prefs.time_limit_secs * 1000) {
+        notify(`Zeitlimit erreicht: ${boxCount} Karten in ${Math.round((Date.now() - boxStart) / 60000)} Minuten`)
+        boxStart = Date.now()
+        boxCount = 0
+      }
       await next()
     } catch (e) {
       notify(String(e?.message ?? e), true)
@@ -57,13 +105,20 @@
   function onKey(e) {
     if (editing) return
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') return e.preventDefault(), undo()
-    if (e.key === 'Escape') return onExit()
+    if (e.key === 'Escape') return exit()
     if (!card) return
+    if (e.key === 'a' || e.key === 'A') return toggleAuto()
     if (e.key === 'e') return (editing = true)
     if (e.key === '-') return bury()
     if (!revealed && (e.key === ' ' || e.key === 'Enter')) return e.preventDefault(), reveal()
     if (revealed && (e.key === ' ' || e.key === 'Enter')) return e.preventDefault(), answer(3)
     if (revealed && ['1', '2', '3', '4'].includes(e.key)) answer(Number(e.key))
+  }
+
+  function toggleAuto() {
+    if (!card.study.seconds_question && !card.study.seconds_answer) return notify('„Automatisch weiter“ ist in den Stapel-Optionen nicht eingestellt')
+    autoAdvance = !autoAdvance
+    notify(autoAdvance ? 'Automatisch weiter: an' : 'Automatisch weiter: aus')
   }
 
   next()
@@ -73,14 +128,22 @@
 
 <div class="study">
   <header>
-    <button class="plain" onclick={onExit}><ArrowLeft size={17} />{deckName} <kbd>Esc</kbd></button>
+    <button class="plain" onclick={exit}><ArrowLeft size={17} />{deckName} <kbd>Esc</kbd></button>
     {#if card}
-      <div class="counts num" aria-label="Verbleibend">
-        <span class="c-new" class:cur={card.queue === 0}>{card.counts.new}</span>
-        <span class="c-learn" class:cur={card.queue === 1 || card.queue === 3}>{card.counts.learn}</span>
-        <span class="c-review" class:cur={card.queue === 2}>{card.counts.review}</span>
+      <div class="mid">
+        {#if prefs.show_remaining_due_counts}
+          <div class="counts num" aria-label="Verbleibend">
+            <span class="c-new" class:cur={card.queue === 0}>{card.counts.new}</span>
+            <span class="c-learn" class:cur={card.queue === 1 || card.queue === 3}>{card.counts.learn}</span>
+            <span class="c-review" class:cur={card.queue === 2}>{card.counts.review}</span>
+          </div>
+        {/if}
+        {#if card.study.show_timer}<span class="timer num" class:capped={elapsed >= card.study.cap_secs}>{clock(elapsed)}</span>{/if}
       </div>
       <div class="tools">
+        {#if card.study.seconds_question || card.study.seconds_answer}
+          <button class="plain" class:active={autoAdvance} onclick={toggleAuto} title="Automatisch weiter (A)"><FastForward size={17} /></button>
+        {/if}
         <button class="plain" onclick={undo} title="Rückgängig (⌘Z)"><Undo2 size={17} /></button>
         <button class="plain" onclick={() => (editing = true)} title="Bearbeiten (E)"><Pencil size={17} /></button>
       </div>
@@ -89,16 +152,17 @@
 
   {#if done}
     <div class="done">
-      <h1>Fertig für heute.</h1>
-      <p class="muted">In „{deckName}“ ist gerade nichts mehr fällig. Lernkarten kommen nach ihrer Lernstufe zurück.</p>
+      <h1>{temporary ? 'Vorgelernt.' : 'Fertig für heute.'}</h1>
+      <p class="muted">{temporary ? 'Die Karten sind neu eingeplant. Lernkarten, die noch offen sind, kehren in ihre Stapel zurück.' : `In „${deckName}“ ist gerade nichts mehr fällig. Lernkarten kommen nach ihrer Lernstufe zurück.`}</p>
       <div class="row">
-        <button onclick={onExit}>Zur Übersicht</button>
+        <button onclick={exit}>Zur Übersicht</button>
         <button class="ghost" onclick={undo}>Letzte Antwort rückgängig</button>
       </div>
     </div>
   {:else if card}
     <div class="card-area">
-      <CardFrame html={revealed ? card.answer : card.question} css={card.css} ord={card.ord} onkey={onKey} />
+      <CardFrame html={revealed ? card.answer : card.question} css={card.css} ord={card.ord} onkey={onKey}
+        autoplay={card.study.autoplay} hideAudio={prefs.hide_audio_play_buttons} />
     </div>
     <footer>
       {#if !revealed}
@@ -107,7 +171,7 @@
         <div class="answers">
           {#each BUTTONS as b, i}
             <button class="ans {b.cls}" onclick={() => answer(b.ease)}>
-              <span class="ivl num">{card.buttons[i]}</span>
+              {#if prefs.show_intervals_on_buttons}<span class="ivl num">{card.buttons[i]}</span>{/if}
               <span>{b.label}</span>
               <kbd>{b.ease}</kbd>
             </button>
@@ -130,7 +194,11 @@
 <style>
   .study { height: 100%; display: flex; flex-direction: column; }
   header { display: flex; align-items: center; padding: 14px 20px; gap: 16px; }
-  .counts { display: flex; gap: 14px; font-weight: 650; margin: 0 auto; font-size: 15px; }
+  .mid { margin: 0 auto; display: flex; align-items: center; gap: 20px; }
+  .counts { display: flex; gap: 14px; font-weight: 650; font-size: 15px; }
+  .timer { font-size: 14px; color: var(--ink-2); font-weight: 500; }
+  .timer.capped { color: var(--m-red); }
+  .tools .active { color: var(--paper); background: var(--ink); }
   .counts span { padding-bottom: 2px; border-bottom: 2px solid transparent; }
   .counts .cur { border-bottom-color: currentColor; }
   .c-new { color: var(--new); } .c-learn { color: var(--learn); } .c-review { color: var(--review); }

@@ -1,7 +1,7 @@
 <script>
   // Renders card HTML/CSS (user content) isolated in a sandboxed iframe without same-origin,
   // so card scripts can't reach the app API. Media resolves from /media/. Keys are forwarded via postMessage.
-  let { html, css, ord = 0, onkey = null } = $props()
+  let { html, css, ord = 0, onkey = null, autoplay = true, hideAudio = false } = $props()
 
   let frame = $state()
   const dark = matchMedia('(prefers-color-scheme: dark)').matches
@@ -16,13 +16,16 @@
   hr#answer{border:0;border-top:1px solid #8884;margin:28px 0}
   audio{display:block;margin:12px auto}
   .ba-tts{border:1px solid #8886;background:transparent;color:inherit;border-radius:8px;padding:4px 8px;cursor:pointer;vertical-align:middle}
+  ${hideAudio ? 'audio,.ba-tts{display:none}' : ''}
 </style><style>${css}</style>
 <script>
   addEventListener('keydown', (e) => parent.postMessage({ key: e.key, meta: e.metaKey || e.ctrlKey }, '*'))
   addEventListener('load', () => document.getElementById('answer')?.scrollIntoView())
   const say = (b) => { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(b.dataset.text); u.lang = b.dataset.lang; speechSynthesis.speak(u) }
   addEventListener('click', (e) => { const b = e.target.closest('.ba-tts'); if (b) say(b) })
-  addEventListener('load', () => document.querySelectorAll('.ba-tts[data-auto="1"]').forEach(say))
+  const AUTOPLAY = ${autoplay}
+  addEventListener('DOMContentLoaded', () => AUTOPLAY || document.querySelectorAll('audio').forEach((a) => { a.autoplay = false; a.pause() }))
+  addEventListener('load', () => AUTOPLAY && document.querySelectorAll('.ba-tts[data-auto="1"]').forEach(say))
 <\/script></head>
 <body class="card card${ord + 1}${dark ? ' nightMode night_mode' : ''}">${html}</body></html>`)
 

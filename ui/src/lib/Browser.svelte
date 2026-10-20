@@ -7,6 +7,12 @@
   let { flat, run, notify } = $props()
 
   let query = $state('')
+  api.preferences().then((p) => {
+    if (p.editing.default_search_text && !query) {
+      query = p.editing.default_search_text
+      search()
+    }
+  })
   let deckFilter = $state('')
   let status = $state('')
   let debounce

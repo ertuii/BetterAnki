@@ -126,7 +126,8 @@ def disconnect(target: str) -> None:
 def refresh_paths() -> None:
     """On app start: if BetterAnki is registered but the app moved, point the entries at the new location."""
     try:
-        if status()["unstable_location"]:
+        # only the installed app may claim the entries; a dev run must not repoint them to the project's venv
+        if not getattr(sys, "frozen", False) or status()["unstable_location"]:
             return
         if _state(_read_desktop().get("mcpServers", {}).get(NAME)) == "outdated":
             _connect_desktop()

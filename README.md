@@ -9,14 +9,15 @@ Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen �
 
 ## Funktionen
 
-- **Heute:** fällige Karten, Semesterstreifen (Lernverlauf + Prognose), Stapel mit Unterstapeln
+- **Heute:** fällige Karten, Semesterstreifen (Lernverlauf + Prognose; Klick auf einen künftigen Tag lernt dessen Karten vor), Stapel mit Unterstapeln
 - **Lernen:** Tastatur (Leertaste, 1–4), Bearbeiten, Rückgängig, Zurückstellen, Audio, Vorlesen (`{{tts de_DE:Feld}}`)
 - **Hinzufügen / Browser:** Rich-Text-Felder, Lückentext, Suche mit Anki-Syntax, Filter nach Stapel und Status, Aussetzen, Markieren, Verschieben
-- **Stapel-Optionen:** Voreinstellungen, Tageslimits, Lernschritte, Lästlinge, Zurückstellen, **FSRS** inkl. Optimierung
+- **Stapel-Optionen:** alle Optionen von Anki – Voreinstellungen, Tageslimits (auch nur für diesen Stapel / nur heute), Lernschritte, Lästlinge, Anzeigereihenfolge, Zurückstellen, Audio, Timer, Automatisch weiter, Leichte Tage, SM-2-Faktoren, **FSRS** inkl. Optimierung
 - **Gefilterte Stapel:** Karten per Suche zum Pauken sammeln
 - **Statistik:** Wiederholungen, Prognose, Kartenzahlen, Intervalle, Tageszeit, Erinnerung, Antworttasten
 - **Notiztypen:** Felder, Kartenvorlagen und CSS bearbeiten, mit Live-Vorschau
-- **Einstellungen:** optionale AnkiWeb-Synchronisierung, automatische Sicherungen + Wiederherstellen, Export der ganzen Sammlung, Claude-Befehl zum Kopieren
+- **Von Anki umziehen:** erkennt Anki-Profile auf dem Rechner und übernimmt sie mit Lernstand und Medien (ersetzen oder hinzufügen); Anki bleibt unverändert
+- **Einstellungen:** Ankis globale Einstellungen (Tageswechsel, Vorauslernen, Zeitlimit, Anzeige, Lastverteilung, Editor, Sicherungsintervalle), optionale AnkiWeb-Synchronisierung, automatische Sicherungen + Wiederherstellen, Export der ganzen Sammlung, Claude-Befehl zum Kopieren
 - **Import/Export:** `.apkg`, `.colpkg`, CSV (mit Vorschau, Stapel- und Spaltenwahl), auch per Drag & Drop ins Fenster
 
 Noch nicht: Bild-Verdeckung (Image Occlusion), Add-ons.
@@ -53,7 +54,7 @@ Heute: `Leertaste` lernen, `A` hinzufügen. Lernen: `Leertaste` aufdecken / Gut,
 ## Test
 
 ```sh
-uv run python tests/test_core.py && uv run python tests/test_phase2.py && uv run python tests/test_phase3.py
+uv run python tests/test_core.py && uv run python tests/test_phase2.py && uv run python tests/test_phase3.py && uv run python tests/test_phase4.py
 cd ui && npm run check
 ```
 

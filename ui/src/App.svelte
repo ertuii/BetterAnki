@@ -59,6 +59,11 @@
     importing = path
   }
 
+  async function prelearn(daysAhead) {
+    const r = await run(() => api.prelearn(daysAhead))
+    if (r) go('study', { deckId: r.deck_id, deckName: r.name, temporary: true })
+  }
+
   function go(name, extra = {}) {
     view = { name, ...extra }
     if (name === 'today') refresh()
@@ -95,9 +100,9 @@
 
   <main>
     {#if view.name === 'today'}
-      <Today {decks} {flat} {overview} {run} {notify} onOptions={(d) => go('options', { deckId: d.id })} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
+      <Today {decks} {flat} {overview} {run} {notify} onOptions={(d) => go('options', { deckId: d.id })} onPrelearn={prelearn} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
     {:else if view.name === 'study'}
-      <Study deckId={view.deckId} deckName={view.deckName} {flat} {notify} onExit={() => go('today')} />
+      <Study deckId={view.deckId} deckName={view.deckName} temporary={view.temporary} {flat} {notify} onExit={() => go('today')} />
     {:else if view.name === 'add'}
       <div class="page"><h1>Karten hinzufügen</h1><Editor {flat} {notify} onSaved={refresh} /></div>
     {:else if view.name === 'browse'}

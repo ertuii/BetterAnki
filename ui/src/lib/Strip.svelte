@@ -1,7 +1,9 @@
 <script>
   // The semester strip: one cell per day. Past = reviews done, today outlined, future = forecast due.
-  let { past, future } = $props()
+  // Clicking a future day with due cards offers to learn them ahead.
+  let { past, future, onPrelearn = null } = $props()
   let width = $state(1000)
+  let picked = $state(null) // { index, cell }
 
   const DAY = 86400000
   const fmt = (d) => d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -30,23 +32,49 @@
   )
 
   const tip = (c) =>
-    c.kind === 'future' ? `${fmt(c.date)}: ${c.n} Wiederholungen geplant`
+    c.kind === 'future' ? `${fmt(c.date)}: ${c.n} Wiederholungen geplant${c.n ? ' – klicken zum Vorlernen' : ''}`
     : `${fmt(c.date)}${c.kind === 'today' ? ' (heute)' : ''}: ${c.n} ${c.n === 1 ? 'Karte' : 'Karten'} gelernt`
 </script>
 
+<svelte:window onclick={(e) => !(e.target instanceof Element && e.target.closest('.strip-wrap')) && (picked = null)} />
+
 <div class="strip-wrap" bind:clientWidth={width}>
-  <div class="strip" style:grid-template-columns="repeat({cells.length}, 1fr)" role="img" aria-label="Lernverlauf und Prognose">
-    {#each cells as c}
-      <i class="l{c.level} {c.kind}" class:has={c.kind === 'future' && c.n > 0} title={tip(c)}></i>
+  <div class="strip" style:grid-template-columns="repeat({cells.length}, 1fr)" aria-label="Lernverlauf und Prognose">
+    {#each cells as c, i}
+      {#if c.kind === 'future' && c.n > 0 && onPrelearn}
+        <i class="l{c.level} future has pick" class:on={picked?.index === i} title={tip(c)} role="button" tabindex="0"
+          aria-label="{fmt(c.date)}: {c.n} fällig, vorlernen"
+          onclick={() => (picked = picked?.index === i ? null : { index: i, cell: c })}
+          onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), (picked = { index: i, cell: c }))}></i>
+      {:else}
+        <i class="l{c.level} {c.kind}" class:has={c.kind === 'future' && c.n > 0} title={tip(c)}></i>
+      {/if}
     {/each}
   </div>
+  {#if picked}
+    <div class="pop" style:left="{Math.min(Math.max((picked.index + 0.5) / cells.length * 100, 12), 88)}%" role="dialog" aria-label="Vorlernen">
+      <b>{fmt(picked.cell.date)}</b>
+      <span class="muted">{picked.cell.n} {picked.cell.n === 1 ? 'Karte' : 'Karten'} fällig, in {-picked.cell.ago} {-picked.cell.ago === 1 ? 'Tag' : 'Tagen'}</span>
+      <button class="sm" onclick={() => { onPrelearn(-picked.cell.ago); picked = null }}>Jetzt vorlernen</button>
+    </div>
+  {/if}
   <div class="months" style:grid-template-columns="repeat({cells.length}, 1fr)">
     {#each months as m}<span style:grid-column="{m.col} / span 20">{m.label}</span>{/each}
   </div>
 </div>
 
 <style>
+  .strip-wrap { position: relative; }
   .strip { display: grid; gap: 2px; }
+  .pick { cursor: pointer; }
+  .pick:hover, .pick.on { background: var(--heat-2); border-color: var(--heat-3); }
+  .pop {
+    position: absolute; top: 34px; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; gap: 6px;
+    background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; min-width: 210px;
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.14); font-size: 13px; animation: in 160ms var(--ease);
+  }
+  .pop button { margin-top: 4px; align-self: flex-start; }
+  @keyframes in { from { opacity: 0; transform: translate(-50%, -4px); } }
   i { height: 22px; border-radius: 2px; background: var(--paper-3); transition: transform 120ms var(--ease); }
   i:hover { transform: scaleY(1.25); }
   .l1 { background: var(--heat-1); }

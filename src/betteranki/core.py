@@ -144,11 +144,10 @@ class Core:
 
     # ---------- deck options (presets) & FSRS ----------
 
-    _OPTION_FIELDS = (
-        "new_per_day", "reviews_per_day", "graduating_interval_good", "graduating_interval_easy",
-        "maximum_review_interval", "leech_threshold", "leech_action", "bury_new", "bury_reviews",
-        "bury_interday_learning", "desired_retention",
-    )
+    # every scalar option of an Anki preset is exposed; these are list-valued or internal
+    _LIST_OPTIONS = ("learn_steps", "relearn_steps", "easy_days_percentages")
+    _HIDDEN_OPTIONS = ("fsrs_params_4", "fsrs_params_5", "fsrs_params_6", "other")
+    _LIMITS = ("new", "review", "new_today", "review_today")
 
     def _configs_for(self, deck_id: int):
         info = self._col.decks.get_deck_configs_for_update(deck_id)
@@ -156,51 +155,92 @@ class Core:
 
     @_locked
     def deck_options(self, deck_id: int, preset_id: int | None = None) -> dict:
+        """All of Anki's preset options (flat, by their protobuf names) plus deck-only limits and global flags."""
         info, by_id = self._configs_for(deck_id)
         cfg = by_id[preset_id or info.current_deck.config_id].config
         c = cfg.config
+        opts = {}
+        for f in c.DESCRIPTOR.fields:
+            if f.name in self._HIDDEN_OPTIONS:
+                continue
+            v = getattr(c, f.name)
+            opts[f.name] = [round(x, 4) for x in v] if f.name in self._LIST_OPTIONS else round(v, 4) if isinstance(v, float) else v
+        lim = info.current_deck.limits
         return {
+            **opts,
             "deck_name": info.current_deck.name,
             "preset_id": cfg.id,
             "presets": [{"id": x.config.id, "name": x.config.name, "decks": x.use_count} for x in info.all_config],
             "fsrs": info.fsrs,
             "fsrs_optimized": len(c.fsrs_params_6) > 0,
             "days_since_optimize": info.days_since_last_fsrs_optimize,
-            "learn_steps": list(c.learn_steps),
-            "relearn_steps": list(c.relearn_steps),
-            **{f: getattr(c, f) for f in self._OPTION_FIELDS},
-            "desired_retention": round(c.desired_retention, 2),
+            # deck-only overrides; None = use the preset
+            "limits": {k: (getattr(lim, k) if lim.HasField(k) else None) for k in self._LIMITS},
+            "new_cards_ignore_review_limit": info.new_cards_ignore_review_limit,
+            "apply_all_parent_limits": info.apply_all_parent_limits,
         }
 
-    def _save_configs(self, deck_id: int, info, cfg, fsrs: bool):
+    def _save_configs(self, deck_id: int, info, cfg, fsrs: bool, limits=None, flags: dict | None = None, reschedule=False):
         from anki.deck_config_pb2 import UpdateDeckConfigsRequest
 
+        flags = flags or {}
         self._col.decks.update_deck_configs(UpdateDeckConfigsRequest(
             target_deck_id=deck_id,
             configs=[cfg],  # the last config is the one applied to the target deck
-            limits=info.current_deck.limits,
+            limits=limits or info.current_deck.limits,
             card_state_customizer=info.card_state_customizer,
-            new_cards_ignore_review_limit=info.new_cards_ignore_review_limit,
-            apply_all_parent_limits=info.apply_all_parent_limits,
+            new_cards_ignore_review_limit=flags.get("new_cards_ignore_review_limit", info.new_cards_ignore_review_limit),
+            apply_all_parent_limits=flags.get("apply_all_parent_limits", info.apply_all_parent_limits),
             fsrs=fsrs,
-            fsrs_reschedule=False,
+            fsrs_reschedule=reschedule,
             fsrs_health_check=info.fsrs_health_check,
         ))
 
     @_locked
     def save_deck_options(self, deck_id: int, options: dict) -> None:
-        """options: same keys as deck_options(); preset_id picks which preset this deck uses."""
+        """options: same shape as deck_options(); unknown keys are ignored, missing keys keep their value.
+        'fsrs_reschedule': True reschedules all cards when FSRS settings change."""
         info, by_id = self._configs_for(deck_id)
         cfg = by_id[options.get("preset_id", info.current_deck.config_id)].config
         c = cfg.config
-        for f in self._OPTION_FIELDS:
-            if f in options:
-                setattr(c, f, type(getattr(c, f))(options[f]))
-        for f in ("learn_steps", "relearn_steps"):
-            if f in options:
-                del getattr(c, f)[:]
-                getattr(c, f).extend(float(x) for x in options[f])
-        self._save_configs(deck_id, info, cfg, bool(options.get("fsrs", info.fsrs)))
+        for f in c.DESCRIPTOR.fields:
+            if f.name in self._HIDDEN_OPTIONS or f.name not in options:
+                continue
+            if f.name in self._LIST_OPTIONS:
+                del getattr(c, f.name)[:]
+                getattr(c, f.name).extend(float(x) for x in options[f.name])
+            else:
+                setattr(c, f.name, type(getattr(c, f.name))(options[f.name]))
+        limits = None
+        if "limits" in options:
+            limits = type(info.current_deck.limits)()
+            limits.CopyFrom(info.current_deck.limits)
+            for k in self._LIMITS:
+                v = options["limits"].get(k)
+                limits.ClearField(k) if v in (None, "") else setattr(limits, k, int(v))
+            limits.new_today_active = options["limits"].get("new_today") not in (None, "")
+            limits.review_today_active = options["limits"].get("review_today") not in (None, "")
+        self._save_configs(deck_id, info, cfg, bool(options.get("fsrs", info.fsrs)), limits,
+                           {k: options[k] for k in ("new_cards_ignore_review_limit", "apply_all_parent_limits") if k in options},
+                           bool(options.get("fsrs_reschedule")))
+
+    # ---------- global preferences ----------
+
+    @_locked
+    def preferences(self) -> dict:
+        from google.protobuf.json_format import MessageToDict
+
+        p = MessageToDict(self._col.get_preferences(), preserving_proto_field_name=True, always_print_fields_with_no_presence=True)
+        p["scheduling"].pop("new_review_mix", None)  # legacy, superseded by the per-preset option
+        return p
+
+    @_locked
+    def save_preferences(self, prefs: dict) -> None:
+        from google.protobuf.json_format import ParseDict
+
+        p = self._col.get_preferences()
+        ParseDict(prefs, p, ignore_unknown_fields=True)
+        self._col.set_preferences(p)
 
     @_locked
     def new_preset(self, deck_id: int, name: str) -> int:
@@ -450,14 +490,14 @@ class Core:
 
     # ---------- studying ----------
 
-    def _render(self, card, side: str) -> str:
+    def _render(self, card, side: str, autoplay: bool = True) -> str:
         out = card.render_output(reload=side == "q")
         text = out.question_text if side == "q" else out.answer_text
         tags = out.question_av_tags if side == "q" else out.answer_av_tags
 
         def audio(m):
             tag = tags[int(m.group(2))] if int(m.group(2)) < len(tags) else None
-            auto = m.group(1) == side
+            auto = autoplay and m.group(1) == side
             if isinstance(tag, SoundOrVideoTag):
                 return f'<audio controls {"autoplay" if auto else ""} src="{html.escape(tag.filename)}"></audio>'
             if isinstance(tag, TTSTag):  # spoken by the system voice via speechSynthesis inside the card frame
@@ -479,16 +519,33 @@ class Core:
         card.start_timer()
         self._current = (card, qc.states)
         labels = self._col.sched.describe_next_states(qc.states)
+        study = self._study_options(card)
         return {
             "card_id": card.id,
             "note_id": card.nid,
             "ord": card.ord,
-            "question": self._render(card, "q"),
-            "answer": self._render(card, "a"),
+            "question": self._render(card, "q", study["autoplay"]),
+            "answer": self._render(card, "a", study["autoplay"]),
             "css": card.render_output().css,
             "buttons": [_strip(x) for x in labels],  # interval labels for Again/Hard/Good/Easy
             "counts": {"new": queued.new_count, "learn": queued.learning_count, "review": queued.review_count},
             "queue": qc.queue,  # 0 new, 1 learning, 2 review
+            "study": study,
+        }
+
+    def _study_options(self, card) -> dict:
+        """The preset options the review screen itself has to honour (audio, timer, auto advance)."""
+        conf = self._col.decks.config_dict_for_deck_id(card.current_deck_id())
+        return {
+            "autoplay": conf.get("autoplay", True),
+            "show_timer": bool(conf.get("timer", 0)),
+            "stop_timer_on_answer": conf.get("stopTimerOnAnswer", False),
+            "cap_secs": conf.get("maxTaken", 60),
+            "seconds_question": conf.get("secondsToShowQuestion", 0),
+            "seconds_answer": conf.get("secondsToShowAnswer", 0),
+            "question_action": conf.get("questionAction", 0),  # 0 show answer, 1 show reminder
+            "answer_action": conf.get("answerAction", 0),  # 0 bury, 1 again, 2 good, 3 hard, 4 reminder
+            "wait_for_audio": conf.get("waitForAudio", True),
         }
 
     @_locked
@@ -510,6 +567,40 @@ class Core:
     @_locked
     def bury_card(self, card_id: int) -> None:
         self._col.sched.bury_cards([card_id])
+
+    # ---------- learn ahead from the timeline ----------
+
+    _PRELEARN = "Vorlernen"
+
+    @_locked
+    def prelearn(self, days_ahead: int) -> dict:
+        """Gather the cards due in `days_ahead` days into a temporary filtered deck and reschedule them on answer
+        (Anki's 'review ahead'). Any previous pre-learn deck is emptied first."""
+        import datetime
+
+        for d in self._col.decks.all_names_and_ids():
+            if d.name.startswith(self._PRELEARN) and self._col.decks.is_filtered(d.id):
+                self._col.decks.remove([d.id])
+        if days_ahead < 1:
+            raise ValueError("Nur Tage in der Zukunft lassen sich vorlernen.")
+        when = datetime.date.today() + datetime.timedelta(days=days_ahead)
+        name = f"{self._PRELEARN} {when.strftime('%d.%m.')}"
+        did = self._col.decks.new_filtered(name)
+        d = self._col.decks.get(did)
+        d["terms"] = [[f"prop:due={days_ahead}", 9999, 6]]  # 6 = order due
+        d["resched"] = True
+        self._col.decks.save(d)
+        count = self._col.sched.rebuild_filtered_deck(did).count
+        if not count:
+            self._col.decks.remove([did])
+            raise ValueError(f"Am {when.strftime('%d.%m.')} ist nichts fällig.")
+        return {"deck_id": did, "name": name, "count": count}
+
+    @_locked
+    def end_prelearn(self, deck_id: int) -> None:
+        """Remove the temporary deck; unanswered cards go back to their home decks unchanged."""
+        if self._col.decks.is_filtered(deck_id) and self._col.decks.name(deck_id).startswith(self._PRELEARN):
+            self._col.decks.remove([deck_id])
 
     # ---------- notes ----------
 
@@ -583,6 +674,13 @@ class Core:
     @_locked
     def delete_notes(self, note_ids: list[int]) -> int:
         return self._col.remove_notes(note_ids).count
+
+    @_locked
+    def add_media(self, filename: str, data_b64: str) -> str:
+        """Store a pasted/dropped file in the media folder; returns the (possibly renamed) file name."""
+        import base64
+
+        return self._col.media.write_data(Path(filename).name or "bild.png", base64.b64decode(data_b64))
 
     # ---------- browser ----------
 
@@ -802,6 +900,92 @@ class Core:
     def export_collection(self, path: str, media: bool = True) -> None:
         """Whole collection as .colpkg (for moving to another computer or Anki itself)."""
         self._col.export_collection_package(path, include_media=media, legacy=False)
+
+    # ---------- migration from Anki desktop ----------
+
+    @staticmethod
+    def _anki_base() -> Path:
+        if sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / "Anki2"
+        if sys.platform == "win32":
+            return Path(os.environ["APPDATA"]) / "Anki2"
+        return Path.home() / ".local" / "share" / "Anki2"
+
+    def anki_profiles(self) -> list[dict]:
+        """Anki desktop profiles on this computer, read without opening them in Anki's sense (read-only SQLite)."""
+        import sqlite3
+
+        base = self._anki_base()
+        out = []
+        for col in sorted(base.glob("*/collection.anki2")) if base.exists() else []:
+            info = {"name": col.parent.name, "path": str(col), "locked": False, "cards": None, "notes": None,
+                    "modified": col.stat().st_mtime}
+            try:
+                db = sqlite3.connect(f"file:{col}?mode=ro", uri=True, timeout=0.3)
+                info["cards"], info["notes"] = db.execute("select (select count() from cards), (select count() from notes)").fetchone()
+                db.close()
+            except sqlite3.OperationalError:
+                info["locked"] = True  # Anki has it open (exclusive lock)
+            media = col.parent / "collection.media"
+            info["media"] = sum(1 for _ in os.scandir(media)) if media.exists() else 0
+            out.append(info)
+        return out
+
+    @_locked
+    def migrate_from_anki(self, collection: str, mode: str = "replace") -> str:
+        """mode 'replace': this collection becomes a copy of Anki's (a backup is made first).
+        mode 'merge': Anki's decks, cards, review history and media are imported into this collection.
+        Anki's own files are only read, never changed."""
+        import shutil
+        import tempfile
+
+        src = Path(collection)
+        if any(p["path"] == str(src) and p["locked"] for p in self.anki_profiles()):
+            raise ValueError("Anki ist noch geöffnet. Bitte Anki schließen und erneut versuchen.")
+        media = src.parent / "collection.media"
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            # work on a copy: opening a collection may upgrade its schema, Anki's original must stay untouched
+            for suffix in ("", "-wal"):
+                if Path(str(src) + suffix).exists():
+                    shutil.copy2(str(src) + suffix, tmp / ("collection.anki2" + suffix))
+            if mode == "replace":
+                self._col.create_backup(backup_folder=str(self._backup_dir()), force=True, wait_for_completion=True)
+                dest = Path(self._col.path)
+                self._col.close(downgrade=False)
+                try:
+                    for suffix in ("", "-wal"):
+                        Path(str(dest) + suffix).unlink(missing_ok=True)
+                    for suffix in ("", "-wal"):
+                        if (tmp / ("collection.anki2" + suffix)).exists():
+                            shutil.copy2(tmp / ("collection.anki2" + suffix), str(dest) + suffix)
+                    if media.exists():
+                        shutil.copytree(media, dest.parent / "collection.media", dirs_exist_ok=True)
+                finally:
+                    self._col = Collection(str(dest))
+                    self._current = None
+                return f"Anki-Sammlung übernommen: {self._col.card_count()} Karten. Dein vorheriger Stand liegt unter Sicherungen."
+            # merge: export everything from the copy as .apkg (with media and scheduling) and import it here
+            if media.exists():
+                try:
+                    (tmp / "collection.media").symlink_to(media, target_is_directory=True)
+                except OSError:  # Windows without symlink rights
+                    shutil.copytree(media, tmp / "collection.media")
+            other = Collection(str(tmp / "collection.anki2"))
+            try:
+                other.export_anki_package(
+                    out_path=str(tmp / "all.apkg"), limit=None,
+                    options=ExportAnkiPackageOptions(with_scheduling=True, with_deck_configs=True, with_media=True, legacy=False),
+                )
+            finally:
+                other.close(downgrade=False)
+            log = self._col.import_anki_package(ImportAnkiPackageRequest(
+                package_path=str(tmp / "all.apkg"),
+                options=ImportAnkiPackageOptions(with_scheduling=True, with_deck_configs=True),
+            )).log
+            return f"Aus Anki zusammengeführt: {len(log.new)} neu, {len(log.updated)} aktualisiert, {len(log.duplicate)} schon vorhanden."
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     # ---------- storage location ----------
 
