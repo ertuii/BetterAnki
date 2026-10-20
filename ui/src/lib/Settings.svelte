@@ -21,7 +21,18 @@
   let prefs = $state(null)
   let cardCount = $state(0)
   let prefTimer
+  let features = $state(null)
   let version = $state('')
+
+  async function saveFeatures() {
+    try {
+      await api.save_features($state.snapshot(features))
+      await refresh()
+      notify('Gespeichert')
+    } catch (e) {
+      fail(e)
+    }
+  }
   let checking = $state(false)
 
   async function lookForUpdate() {
@@ -202,10 +213,34 @@
 
   load()
   api.app_version().then((v) => (version = v))
+  api.features().then((f) => (features = f))
+
+  const EXTRAS = [
+    { key: 'exams', name: 'Prüfungstermine', hint: 'Klausurdatum pro Stapel eintragen. Die App rechnet aus, wie viele neue Karten pro Tag nötig sind, und markiert die Prüfung im Zeitstrahl.' },
+    { key: 'plan', name: 'Lernplan', hint: 'Auf der Heute-Seite eine Dauer wählen und über alle Stapel lernen, Stapel mit naher Prüfung zuerst.' },
+    { key: 'weak', name: 'Schwachstellen', hint: 'In der Statistik sehen, bei welchen Themen und Stapeln du am meisten vergisst, und gezielt üben.' },
+  ]
 </script>
 
 <div class="settings">
   <h1>Einstellungen</h1>
+
+  {#if features}
+    <section>
+      <h2>Zusatzfunktionen</h2>
+      <p class="muted">Funktionen, die es in Anki nicht gibt. Schalte nur ein, was du brauchst.</p>
+      <div class="extras">
+        {#each EXTRAS as x}
+          <label class="extra"><input type="checkbox" bind:checked={features[x.key]} onchange={saveFeatures} />
+            <span><b>{x.name}</b><small class="muted">{x.hint}</small></span>
+          </label>
+        {/each}
+        <label class="extra"><input type="checkbox" bind:checked={features.inbox} onchange={saveFeatures} />
+          <span><b>Karten von Claude erst prüfen</b><small class="muted">Neue Karten von Claude warten im Eingang, bis du sie übernimmst. Ausgeschaltet werden sie sofort gelernt.</small></span>
+        </label>
+      </div>
+    </section>
+  {/if}
 
   <section>
     <h2>Von Anki übernehmen</h2>
@@ -402,6 +437,11 @@
   section > p { font-size: 14px; max-width: 65ch; }
   .small { font-size: 13px !important; }
   .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .extras { display: flex; flex-direction: column; gap: 14px; }
+  .extra { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; }
+  .extra input { margin-top: 3px; }
+  .extra span { display: flex; flex-direction: column; gap: 2px; max-width: 62ch; }
+  .extra small { font-size: 13px; }
   .row span { margin-right: 8px; }
   .login { display: flex; gap: 8px; flex-wrap: wrap; }
   .login input { flex: 1 1 200px; }

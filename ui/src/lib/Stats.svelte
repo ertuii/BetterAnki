@@ -2,11 +2,12 @@
   import { api } from './api.js'
   import Bars from './Bars.svelte'
 
-  let { flat, notify } = $props()
+  let { flat, notify, weak = false, onPractice } = $props()
 
   let deckId = $state(0)
   let days = $state(30)
   let s = $state(null)
+  let spots = $state(null) // weak spots by tag and deck
 
   const PERIODS = [
     { d: 30, label: '1 Monat' },
@@ -46,6 +47,9 @@
     void [deckId, days]
     load()
   })
+  $effect(() => {
+    if (weak) api.weak_spots(days).then((w) => (spots = w))
+  })
 
   const DAY = 86400000
   const dayLabel = (offset) => new Date(Date.now() + offset * DAY).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })
@@ -83,6 +87,31 @@
       <div><dt class="num">{s.future[1] ?? 0}</dt><dd>morgen fällig</dd></div>
       <div><dt class="num">{activeDays} / {days}</dt><dd>Tage gelernt</dd></div>
     </dl>
+
+    {#if weak && spots}
+      <section class="weak">
+        <h2>Schwachstellen</h2>
+        {#if spots.spots.length}
+          <p class="muted">Themen (Tags) und Stapel, bei denen du weniger Wiederholungen richtig beantwortest als im Durchschnitt ({spots.overall} %, der Strich). Schwächste zuerst.</p>
+          <ul>
+            {#each spots.spots as w (w.kind + w.name)}
+              <li>
+                <span class="wname"><span class="kind">{w.kind === 'tag' ? 'Tag' : 'Stapel'}</span>{w.name}</span>
+                <span class="meter" title="{w.retention} % von {w.reviews} Wiederholungen">
+                  <i style:width="{w.retention}%"></i>
+                  <span class="avg" style:left="{spots.overall}%"></span>
+                </span>
+                <span class="num val">{w.retention} %</span>
+                <span class="num muted cnt">{w.reviews}×</span>
+                <button class="ghost sm" onclick={() => onPractice(w.kind, w.name)}>Üben</button>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="muted">{spots.reviews ? 'Keine Ausreißer: Kein Thema liegt unter deinem Durchschnitt, oder es hat weniger als 10 Wiederholungen.' : 'Noch keine Wiederholungen in diesem Zeitraum.'}</p>
+        {/if}
+      </section>
+    {/if}
 
     <div class="grid">
       <section class="wide">
@@ -176,6 +205,15 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 40px 48px; }
   section { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   section.wide { grid-column: 1 / -1; }
+  .weak ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; max-width: 900px; }
+  .weak li { display: grid; grid-template-columns: minmax(140px, 1.4fr) 2fr 52px 52px auto; align-items: center; gap: 14px; padding: 6px 0; border-bottom: 1px solid var(--rule); font-size: 14px; }
+  .wname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .kind { font-size: 11px; font-weight: 500; color: var(--ink-2); background: var(--paper-2); border-radius: 99px; padding: 1px 7px; margin-right: 8px; }
+  .meter { position: relative; height: 10px; background: var(--paper-3); border-radius: 4px; }
+  .meter i { position: absolute; inset: 0 auto 0 0; background: var(--heat-3); border-radius: 4px; }
+  .meter .avg { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+  .val { font-weight: 650; text-align: right; }
+  .cnt { text-align: right; font-size: 13px; }
   h2 { font-size: 16px; font-weight: 700; }
   section > p { font-size: 13px; margin-bottom: 10px; }
   .hbar { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; background: var(--paper-3); }

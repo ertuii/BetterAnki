@@ -571,6 +571,22 @@ class Core:
     # ---------- learn ahead from the timeline ----------
 
     _PRELEARN = "Vorlernen"
+    _TEMP = ("Vorlernen", "Üben:")  # temporary filtered decks, removed when their session ends
+
+    def _temp_deck(self, name: str, search: str, order: int = 6) -> int:
+        """A filtered deck for one session; previous ones of any temporary kind are removed first."""
+        for d in self._col.decks.all_names_and_ids():
+            if d.name.startswith(self._TEMP) and self._col.decks.is_filtered(d.id):
+                self._col.decks.remove([d.id])
+        did = self._col.decks.new_filtered(name)
+        d = self._col.decks.get(did)
+        d["terms"] = [[search, 9999, order]]
+        d["resched"] = True
+        self._col.decks.save(d)
+        if not self._col.sched.rebuild_filtered_deck(did).count:
+            self._col.decks.remove([did])
+            return 0
+        return did
 
     @_locked
     def prelearn(self, days_ahead: int) -> dict:
@@ -578,29 +594,187 @@ class Core:
         (Anki's 'review ahead'). Any previous pre-learn deck is emptied first."""
         import datetime
 
-        for d in self._col.decks.all_names_and_ids():
-            if d.name.startswith(self._PRELEARN) and self._col.decks.is_filtered(d.id):
-                self._col.decks.remove([d.id])
         if days_ahead < 1:
             raise ValueError("Nur Tage in der Zukunft lassen sich vorlernen.")
         when = datetime.date.today() + datetime.timedelta(days=days_ahead)
         name = f"{self._PRELEARN} {when.strftime('%d.%m.')}"
-        did = self._col.decks.new_filtered(name)
-        d = self._col.decks.get(did)
-        d["terms"] = [[f"prop:due={days_ahead}", 9999, 6]]  # 6 = order due
-        d["resched"] = True
-        self._col.decks.save(d)
-        count = self._col.sched.rebuild_filtered_deck(did).count
-        if not count:
-            self._col.decks.remove([did])
+        did = self._temp_deck(name, f"prop:due={days_ahead}", 6)  # 6 = order due
+        if not did:
             raise ValueError(f"Am {when.strftime('%d.%m.')} ist nichts fällig.")
-        return {"deck_id": did, "name": name, "count": count}
+        return {"deck_id": did, "name": name, "count": len(self._col.decks.cids(did))}
 
     @_locked
     def end_prelearn(self, deck_id: int) -> None:
         """Remove the temporary deck; unanswered cards go back to their home decks unchanged."""
-        if self._col.decks.is_filtered(deck_id) and self._col.decks.name(deck_id).startswith(self._PRELEARN):
+        if self._col.decks.is_filtered(deck_id) and self._col.decks.name(deck_id).startswith(self._TEMP):
             self._col.decks.remove([deck_id])
+
+    # ---------- optional features (stored in the collection, so they travel with backups and sync) ----------
+
+    _FEATURES = {"exams": False, "plan": False, "weak": False, "inbox": True}
+
+    @_locked
+    def features(self) -> dict:
+        return {**self._FEATURES, **self._col.get_config("betteranki.features", {})}
+
+    @_locked
+    def save_features(self, features: dict) -> None:
+        self._col.set_config("betteranki.features", {k: bool(features[k]) for k in self._FEATURES if k in features})
+
+    # ---------- 1. exam dates ----------
+
+    def _exams(self) -> dict:
+        return self._col.get_config("betteranki.exams", {})  # {deck_id: "YYYY-MM-DD"}
+
+    @_locked
+    def set_exam(self, deck_id: int, date: str | None) -> None:
+        exams = self._exams()
+        if date:
+            exams[str(deck_id)] = date
+        else:
+            exams.pop(str(deck_id), None)
+        self._col.set_config("betteranki.exams", exams)
+
+    @_locked
+    def exam_plan(self) -> list[dict]:
+        """Per exam: how many new cards a day finish the deck in time, leaving the last days for reviews only."""
+        import datetime
+        import math
+
+        today = datetime.date.today()
+        out = []
+        for did, date in sorted(self._exams().items(), key=lambda kv: kv[1]):
+            if not self._col.decks.get(int(did), default=False):
+                continue  # deck was deleted
+            days = (datetime.date.fromisoformat(date) - today).days
+            ids = ",".join(map(str, self._col.decks.deck_and_child_ids(int(did))))
+            new_left = self._col.db.scalar(f"select count() from cards where queue = 0 and did in ({ids})")
+            # ponytail: fixed rule, last fifth of the time (1–7 days) is for reviewing what was learned
+            buffer = min(7, max(1, days // 5))
+            per_day = math.ceil(new_left / max(1, days - buffer)) if new_left and days > 0 else 0
+            info = self._col.decks.get_deck_configs_for_update(int(did))
+            lim = info.current_deck.limits
+            current = lim.new if lim.HasField("new") else self._col.decks.config_dict_for_deck_id(int(did))["new"]["perDay"]
+            out.append({"deck_id": int(did), "name": self._col.decks.name(int(did)), "date": date, "days": days,
+                        "new_left": new_left, "per_day": per_day, "current": current, "buffer": buffer})
+        return out
+
+    @_locked
+    def apply_exam_pace(self, deck_id: int) -> int:
+        """Set this deck's own new-cards limit (not the shared preset) to the pace its exam needs."""
+        plan = next(p for p in self.exam_plan() if p["deck_id"] == deck_id)
+        info, by_id = self._configs_for(deck_id)
+        limits = type(info.current_deck.limits)()
+        limits.CopyFrom(info.current_deck.limits)
+        limits.new = plan["per_day"]
+        self._save_configs(deck_id, info, by_id[info.current_deck.config_id].config, info.fsrs, limits)
+        return plan["per_day"]
+
+    # ---------- 2. study plan across decks ----------
+
+    @_locked
+    def plan_next(self) -> dict | None:
+        """Next card of a session across all decks: decks with the nearest exam first, then the rest in order."""
+        exams = self._exams() if self.features()["exams"] else {}
+        tops = [d for d in self.decks() if not d["filtered"]]
+        tops.sort(key=lambda d: min((exams[str(i)] for i in self._col.decks.deck_and_child_ids(d["id"]) if str(i) in exams), default="9999"))
+        for d in tops:
+            if d["new"] + d["learn"] + d["review"] and (card := self.next_card(d["id"])):
+                return {**card, "deck": d["name"]}
+        return None
+
+    # ---------- 3. weak spots ----------
+
+    @_locked
+    def weak_spots(self, days: int = 90, min_reviews: int = 10) -> dict:
+        """Retention of review answers per tag and per deck, weakest first."""
+        names = {d.id: d.name for d in self._col.decks.all_names_and_ids()}
+        rows = self._col.db.all(
+            "select n.tags, (case when c.odid then c.odid else c.did end), r.ease > 1 from revlog r "
+            "join cards c on c.id = r.cid join notes n on n.id = c.nid where r.id > ? and r.type = 1",
+            (self._col.sched.day_cutoff - days * 86400) * 1000,
+        )
+        groups = {}
+        for tags, did, ok in rows:
+            name = names.get(did, "?")
+            keys = [("tag", t) for t in tags.split() if t != self._INBOX_TAG]
+            keys += [("deck", "::".join(name.split("::")[:i + 1])) for i in range(name.count("::") + 1)]
+            for k in keys:
+                g = groups.setdefault(k, [0, 0])
+                g[0] += ok
+                g[1] += 1
+        total = len(rows)
+        overall = round(100 * sum(r[2] for r in rows) / total) if total else None
+        spots, seen = [], set()
+        for (k, n), (p, t) in sorted(groups.items(), key=lambda kv: kv[0][0] != "deck"):  # decks first
+            if t >= min_reviews and 100 * p / t < (overall or 0) and (p, t) not in seen:  # a tag covering exactly a deck once
+                seen.add((p, t))
+                spots.append({"kind": k, "name": n, "reviews": t, "retention": round(100 * p / t)})
+        spots.sort(key=lambda x: (x["retention"], -x["reviews"]))
+        return {"overall": overall, "reviews": total, "spots": spots[:10]}
+
+    @_locked
+    def practice(self, kind: str, name: str) -> dict:
+        """Temporary deck with the cards of a tag/deck that were forgotten lately or often."""
+        scope = f'"tag:{name}"' if kind == "tag" else f'"deck:{name}"'
+        title = f"Üben: {name.split('::')[-1]}"
+        did = self._temp_deck(title, f"{scope} -is:suspended -is:new (rated:90:1 OR prop:lapses>=2)", 4)  # 4 = most lapses
+        if not did:
+            raise ValueError("Keine vergessenen Karten zum Üben gefunden.")
+        return {"deck_id": did, "name": title, "count": len(self._col.decks.cids(did))}
+
+    # ---------- 4. inbox for cards made by Claude ----------
+
+    _INBOX_TAG = "Claude-Eingang"
+
+    @_locked
+    def inbox(self) -> list[dict]:
+        out = []
+        for nid in self._col.find_notes(f"tag:{self._INBOX_TAG}"):
+            note = self._col.get_note(nid)
+            cards = note.cards()
+            out.append({
+                "note_id": nid,
+                "notetype": note.note_type()["name"],
+                "deck": self._col.decks.name(cards[0].did) if cards else "?",
+                "fields": [[k, _strip(v)[:400]] for k, v in note.items()],
+                "tags": [t for t in note.tags if t != self._INBOX_TAG],
+                "cards": len(cards),
+            })
+        return out
+
+    @_locked
+    def inbox_count(self) -> int:
+        return len(self._col.find_notes(f"tag:{self._INBOX_TAG}"))
+
+    @_locked
+    def accept_inbox(self, note_ids: list[int]) -> int:
+        """Into normal study: unsuspend and drop the inbox tag."""
+        cids = [c for nid in note_ids for c in self._col.card_ids_of_note(nid)]
+        self._col.sched.unsuspend_cards(cids)
+        self._col.tags.bulk_remove(note_ids, self._INBOX_TAG)
+        return len(note_ids)
+
+    @_locked
+    def reject_inbox(self, note_ids: list[int]) -> int:
+        return self._col.remove_notes(note_ids).count
+
+    # ---------- 5. for Claude: cards that keep being forgotten ----------
+
+    @_locked
+    def difficult_cards(self, deck: str | None = None, limit: int = 20) -> list[dict]:
+        """Cards forgotten at least twice (or tagged leech), most lapses first, with full fields."""
+        query = "(prop:lapses>=2 OR tag:leech)" + (f' "deck:{deck}"' if deck else "")
+        out = []
+        for cid in self._col.find_cards(query, order="c.lapses desc")[:limit]:
+            card = self._col.get_card(cid)
+            note = card.note()
+            out.append({
+                "card_id": cid, "note_id": note.id, "notetype": note.note_type()["name"],
+                "deck": self._col.decks.name(card.odid or card.did), "fields": dict(note.items()), "tags": note.tags,
+                "lapses": card.lapses, "reviews": card.reps, "interval_days": card.ivl,
+            })
+        return out
 
     # ---------- notes ----------
 
@@ -634,15 +808,19 @@ class Core:
             note[k] = v
 
     @_locked
-    def add_note(self, notetype, deck, fields, tags: list[str] | None = None) -> int:
-        """notetype/deck: name or id. fields: {name: value} or list in field order."""
+    def add_note(self, notetype, deck, fields, tags: list[str] | None = None, inbox: bool = False) -> int:
+        """notetype/deck: name or id. fields: {name: value} or list in field order.
+        inbox: a card made by Claude; waits suspended in the inbox for review if that feature is on."""
         note = self._col.new_note(self._notetype(notetype))
         self._fill(note, fields)
-        note.tags = tags or []
+        inbox = inbox and self.features()["inbox"]
+        note.tags = (tags or []) + ([self._INBOX_TAG] if inbox else [])
         deck_id = deck if isinstance(deck, int) else self._col.decks.id(deck)
         if not note.fields[0].strip():
             raise ValueError("first field must not be empty")
         self._col.add_note(note, deck_id)
+        if inbox:
+            self._col.sched.suspend_cards(note.card_ids())
         return note.id
 
     @_locked
@@ -664,9 +842,12 @@ class Core:
         note = self._col.get_note(note_id)
         if fields:
             self._fill(note, fields)
+        accepted = tags is not None and self._INBOX_TAG in note.tags and self._INBOX_TAG not in tags
         if tags is not None:
             note.tags = tags
         self._col.update_note(note)
+        if accepted:  # removing the inbox tag by hand counts as accepting the note
+            self._col.sched.unsuspend_cards(note.card_ids())
         if deck is not None:
             deck_id = deck if isinstance(deck, int) else self._col.decks.id(deck)
             self._col.set_deck(note.card_ids(), deck_id)
@@ -767,6 +948,9 @@ class Core:
             "past": [past.get(i, 0) for i in range(past_days - 1, -1, -1)],  # oldest first, last = today
             "future": [future.get(i, 0) for i in range(1, future_days + 1)],
             "overdue": {d["id"]: n for d in self._flat_decks() if (n := self._overdue(d["id"]))},
+            "features": (features := self.features()),
+            "exams": self.exam_plan() if features["exams"] else [],
+            "inbox": self.inbox_count(),
         }
 
     def _flat_decks(self):

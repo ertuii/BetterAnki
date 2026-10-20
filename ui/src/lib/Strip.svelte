@@ -1,7 +1,7 @@
 <script>
   // The semester strip: one cell per day. Past = reviews done, today outlined, future = forecast due.
   // Clicking a future day with due cards offers to learn them ahead.
-  let { past, future, onPrelearn = null } = $props()
+  let { past, future, exams = [], onPrelearn = null } = $props()
   let width = $state(1000)
   let picked = $state(null) // { index, cell }
 
@@ -31,6 +31,14 @@
       .filter((m, i, all) => !all[i + 1] || all[i + 1].col - m.col > 10), // drop a cut-off first month
   )
 
+  // exam markers under the strip, at their day
+  const examMarks = $derived(
+    exams.filter((e) => e.days > 0).flatMap((e) => {
+      const col = cells.findIndex((c) => -c.ago === e.days)
+      return col < 0 ? [] : [{ col: col + 1, label: e.name.split('::').pop() }]
+    }),
+  )
+
   const tip = (c) =>
     c.kind === 'future' ? `${fmt(c.date)}: ${c.n} Wiederholungen geplant${c.n ? ' – klicken zum Vorlernen' : ''}`
     : `${fmt(c.date)}${c.kind === 'today' ? ' (heute)' : ''}: ${c.n} ${c.n === 1 ? 'Karte' : 'Karten'} gelernt`
@@ -56,6 +64,11 @@
       <b>{fmt(picked.cell.date)}</b>
       <span class="muted">{picked.cell.n} {picked.cell.n === 1 ? 'Karte' : 'Karten'} fällig, in {-picked.cell.ago} {-picked.cell.ago === 1 ? 'Tag' : 'Tagen'}</span>
       <button class="sm" onclick={() => { onPrelearn(-picked.cell.ago); picked = null }}>Jetzt vorlernen</button>
+    </div>
+  {/if}
+  {#if examMarks.length}
+    <div class="marks" style:grid-template-columns="repeat({cells.length}, 1fr)">
+      {#each examMarks as m}<span style:grid-column="{m.col} / span 1" title="Prüfung: {m.label}"><b>{m.label}</b></span>{/each}
     </div>
   {/if}
   <div class="months" style:grid-template-columns="repeat({cells.length}, 1fr)">
@@ -84,6 +97,9 @@
   .today.l0 { background: var(--paper-3); }
   .future { background: transparent; border: 1px dashed var(--rule-2); }
   .future.has { border-style: solid; border-color: var(--heat-2); }
+  .marks { display: grid; margin-top: 4px; }
+  .marks span { grid-row: 1; position: relative; height: 18px; border-left: 2px solid var(--ink); }
+  .marks b { position: absolute; right: calc(100% + 4px); top: 2px; font-size: 12px; white-space: nowrap; }
   .months { display: grid; font-size: 12px; color: var(--ink-2); margin-top: 8px; }
   .months span { grid-row: 1; white-space: nowrap; }
 </style>

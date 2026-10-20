@@ -1,5 +1,5 @@
 <script>
-  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear } from '@lucide/svelte'
+  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon } from '@lucide/svelte'
   import { api, flatten, hueFor, total } from './lib/api.js'
   import Today from './lib/Today.svelte'
   import Study from './lib/Study.svelte'
@@ -10,6 +10,7 @@
   import NoteTypes from './lib/NoteTypes.svelte'
   import Settings from './lib/Settings.svelte'
   import ImportDialog from './lib/ImportDialog.svelte'
+  import Inbox from './lib/Inbox.svelte'
 
   let view = $state(/** @type {any} */ ({ name: 'today' }))
   let decks = $state([])
@@ -79,12 +80,20 @@
     if (r) go('study', { deckId: r.deck_id, deckName: r.name, temporary: true })
   }
 
+  async function practice(kind, name) {
+    const r = await run(() => api.practice(kind, name))
+    if (r) go('study', { deckId: r.deck_id, deckName: r.name, temporary: true })
+  }
+
+  const studyPlan = (minutes) => go('study', { plan: true, minutes, deckName: 'Lernplan' })
+
   function go(name, extra = {}) {
     view = { name, ...extra }
     if (name === 'today') refresh()
   }
 
   refresh()
+  ;/** @type {any} */ (window).__baRefresh = refresh // app.py calls this after Claude changed something
   // Claude may add cards via MCP while the app is open; pick them up when the window regains focus.
   window.addEventListener('focus', () => view.name === 'today' && refresh())
 </script>
@@ -97,6 +106,11 @@
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
       <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
+      {#if overview?.inbox || view.name === 'inbox'}
+        <button class="nav" class:on={view.name === 'inbox'} onclick={() => go('inbox')}>
+          <InboxIcon size={17} />Eingang<span class="count num badge">{overview?.inbox || ''}</span>
+        </button>
+      {/if}
     </nav>
     <div class="label">Stapel</div>
     <nav class="decks">
@@ -121,9 +135,9 @@
 
   <main>
     {#if view.name === 'today'}
-      <Today {decks} {flat} {overview} {run} {notify} onOptions={(d) => go('options', { deckId: d.id })} onPrelearn={prelearn} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
+      <Today {decks} {flat} {overview} {run} {notify} onPlan={studyPlan} onInbox={() => go('inbox')} onOptions={(d) => go('options', { deckId: d.id })} onPrelearn={prelearn} onStudy={(d) => go('study', { deckId: d.id, deckName: d.name })} onAdd={() => go('add')} />
     {:else if view.name === 'study'}
-      <Study deckId={view.deckId} deckName={view.deckName} temporary={view.temporary} {flat} {notify} onExit={() => go('today')} />
+      <Study deckId={view.deckId} deckName={view.deckName} temporary={view.temporary} plan={view.plan} minutes={view.minutes} {flat} {notify} onExit={() => go('today')} />
     {:else if view.name === 'add'}
       <div class="page"><h1>Karten hinzufügen</h1><Editor {flat} {notify} onSaved={refresh} /></div>
     {:else if view.name === 'browse'}
@@ -132,8 +146,10 @@
       <NoteTypes {notify} />
     {:else if view.name === 'settings'}
       <Settings {notify} {refresh} {checkUpdate} />
+    {:else if view.name === 'inbox'}
+      <Inbox {flat} {notify} {refresh} />
     {:else if view.name === 'stats'}
-      <Stats {flat} {notify} />
+      <Stats {flat} {notify} weak={overview?.features.weak} onPractice={practice} />
     {:else if view.name === 'options'}
       {#key view.deckId}<DeckOptions deckId={view.deckId} {notify} onBack={() => go('today')} />{/key}
     {/if}
@@ -182,6 +198,8 @@
   .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .count { margin-left: auto; color: var(--ink-2); font-size: 13px; font-weight: 500; }
   .update { margin: 8px 0 10px; padding: 12px; border-radius: var(--radius); background: var(--paper-2); display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+  .badge { color: var(--paper); background: var(--ink); border-radius: 99px; padding: 0 7px; font-size: 12px; }
+  .badge:empty { display: none; }
   .foot { color: var(--ink-2); }
   .foot.on { color: var(--ink); }
   main { overflow: auto; min-width: 0; }

@@ -63,14 +63,41 @@ def list_note_types() -> list[dict]:
 def add_notes(notes: list[dict]) -> list:
     """Add notes in bulk. Each note: {"deck": "Deck::Name", "notetype": "Basic", "fields": {"Front": "...", "Back": "..."}, "tags": ["a"]}.
     Fields may contain HTML. For cloze use notetype "Cloze" with {"Text": "{{c1::Berlin}} ist die Hauptstadt"}.
+    Unless the user turned it off, new notes wait in the app's inbox ("Eingang") until the user accepts them.
     Returns the new note id, or an error string, per note."""
     results = []
     for n in notes:
         try:
-            results.append(call("add_note", notetype=n.get("notetype", "Basic"), deck=n["deck"], fields=n["fields"], tags=n.get("tags", [])))
+            results.append(call("add_note", notetype=n.get("notetype", "Basic"), deck=n["deck"], fields=n["fields"],
+                                tags=n.get("tags", []), inbox=True))
         except Exception as e:
             results.append(f"error: {e}")
     return results
+
+
+@mcp.tool()
+def list_inbox() -> list[dict]:
+    """Notes Claude created that the user has not accepted yet (they are suspended until then)."""
+    return call("inbox")
+
+
+@mcp.tool()
+def difficult_cards(deck: str | None = None, limit: int = 20) -> list[dict]:
+    """Cards the user keeps forgetting (2+ lapses or leech), most lapses first, with full fields.
+    Use to suggest better wording, splitting, cloze or mnemonics; change them with update_note only after the user agrees."""
+    return call("difficult_cards", deck=deck, limit=limit)
+
+
+@mcp.tool()
+def weak_spots(days: int = 90) -> dict:
+    """Retention per tag and per deck over the last days, weakest first (only groups with 10+ reviews)."""
+    return call("weak_spots", days=days)
+
+
+@mcp.tool()
+def exam_plan() -> list[dict]:
+    """Exam dates the user set per deck, days left, new cards left and the new cards per day needed."""
+    return call("exam_plan")
 
 
 @mcp.tool()
@@ -138,6 +165,42 @@ def import_file(path: str) -> str:
 def export_deck(path: str, deck_id: int | None = None) -> int:
     """Export a deck (or everything if no deck_id) as .apkg to an absolute path."""
     return call("export_deck", path=path, deck_id=deck_id)
+
+
+# ---------- ready-made workflows (prompts) ----------
+
+@mcp.prompt(title="Karten aus Material erstellen")
+def karten_aus_material(material: str, deck: str = "") -> str:
+    """Turn lecture notes, a script, a PDF or a pasted text into flashcards."""
+    target = f'in den Stapel "{deck}"' if deck else "in einen passenden Stapel (frag nach, wenn unklar)"
+    return f"""Erstelle Lernkarten aus diesem Material {target}:
+
+{material}
+
+So gehst du vor:
+1. Ist das ein Dateipfad oder Link, lies den Inhalt. Verschaff dir einen Überblick über die Kernaussagen.
+2. Sieh mit list_decks und search_cards nach, was es schon gibt, damit keine Dubletten entstehen.
+3. Schreib atomare Karten: eine Frage, eine Antwort, so kurz wie möglich. Fakten und Definitionen gern als
+   Lückentext (Notiztyp "Cloze"), Zusammenhänge und "Warum"-Fragen als Basic. Keine Aufzählungen auf der Rückseite;
+   lieber mehrere Karten. Fachbegriffe in beide Richtungen nur, wenn das sinnvoll ist.
+4. Vergib Tags nach Thema bzw. Kapitel (ohne Leerzeichen, z. B. Kapitel_3).
+5. Lege alles in einem add_notes-Aufruf an. Die Karten landen im Eingang der App; sag dem Nutzer, dass er sie
+   dort prüft und übernimmt. Fasse kurz zusammen, wie viele Karten zu welchen Themen entstanden sind."""
+
+
+@mcp.prompt(title="Schwierige Karten verbessern")
+def schwierige_karten_verbessern(deck: str = "") -> str:
+    """Find cards that keep being forgotten and rewrite them so they stick."""
+    scope = f'im Stapel "{deck}"' if deck else "in allen Stapeln"
+    return f"""Hilf mir mit den Karten, die ich {scope} immer wieder vergesse.
+
+1. Hol sie mit difficult_cards{f'(deck="{deck}")' if deck else ''}. Schau auch auf weak_spots für Themen mit schlechter Erinnerung.
+2. Finde für jede Karte den wahrscheinlichen Grund: zu viel auf einmal, unklare Frage, Verwechslung mit ähnlichen
+   Karten, reines Auswendiglernen ohne Verständnis.
+3. Schlag konkrete Verbesserungen vor: aufteilen, präziser fragen, Lückentext, Eselsbrücke, Beispiel oder Kontext
+   ergänzen. Zeig mir alt und neu nebeneinander, gruppiert nach Grund.
+4. Ändere erst nach meinem OK: bestehende Karten mit update_note (der Lernstand bleibt erhalten), zusätzliche
+   Karten beim Aufteilen mit add_notes."""
 
 
 def run():

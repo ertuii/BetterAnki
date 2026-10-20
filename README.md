@@ -20,6 +20,14 @@ Deine Daten liegen lokal, standardmäßig hier (änderbar unter *Einstellungen �
 - **Einstellungen:** Ankis globale Einstellungen (Tageswechsel, Vorauslernen, Zeitlimit, Anzeige, Lastverteilung, Editor, Sicherungsintervalle), optionale AnkiWeb-Synchronisierung, automatische Sicherungen + Wiederherstellen, Export der ganzen Sammlung, Claude-Befehl zum Kopieren
 - **Import/Export:** `.apkg`, `.colpkg`, CSV (mit Vorschau, Stapel- und Spaltenwahl), auch per Drag & Drop ins Fenster
 
+- **Eingang für Claude-Karten:** Karten, die Claude anlegt, warten ausgesetzt im Eingang, bis du sie übernimmst, bearbeitest oder verwirfst (abschaltbar)
+
+**Zusatzfunktionen** (gibt es in Anki nicht, einzeln einschaltbar unter *Einstellungen → Zusatzfunktionen*):
+
+- **Prüfungstermine:** Klausurdatum pro Stapel; die App rechnet aus, wie viele neue Karten pro Tag nötig sind (die letzten Tage bleiben fürs Wiederholen) und markiert die Prüfung im Zeitstrahl
+- **Lernplan:** Dauer wählen und über alle Stapel lernen, nahe Prüfungen zuerst
+- **Schwachstellen:** Themen und Stapel unter deinem Durchschnitt in der Statistik, mit „Üben“ für die vergessenen Karten
+
 Noch nicht: Bild-Verdeckung (Image Occlusion), Add-ons.
 
 ## Starten (Entwicklung)
@@ -51,9 +59,11 @@ Erste Installation bei Freunden (App ist nicht signiert): Mac – App einmal öf
 
 In der App: **Einstellungen → Claude verbinden → Verbinden** (für Claude Desktop und/oder Claude Code). Das war's; Claude Desktop danach einmal neu starten. Verschiebst du die App später, trägt sie den neuen Pfad beim nächsten Start selbst nach.
 
-Läuft die App, schreibt Claude direkt in die offene Sammlung (neue Karten erscheinen sofort). Ist sie geschlossen, öffnet der MCP-Server die Sammlung selbst.
+Läuft die App, schreibt Claude direkt in die offene Sammlung (neue Karten erscheinen sofort im Eingang). Ist sie geschlossen, öffnet der MCP-Server die Sammlung selbst.
 
-Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `review_statistics`, `create_filtered_deck`, `import_file`, `export_deck`.
+Tools: `list_decks`, `create_deck`, `rename_deck`, `list_note_types`, `add_notes`, `search_cards`, `get_note`, `update_note`, `delete_notes`, `suspend_cards`, `card_info`, `collection_stats`, `review_statistics`, `create_filtered_deck`, `import_file`, `export_deck`, `list_inbox`, `difficult_cards`, `weak_spots`, `exam_plan`.
+
+Fertige Abläufe (MCP-Prompts): **Karten aus Material erstellen** (Skript, PDF oder Text → Karten, ohne Dubletten) und **Schwierige Karten verbessern** (oft vergessene Karten analysieren und nach deinem OK umformulieren).
 
 Für andere MCP-Clients steht der Startbefehl unter *Einstellungen → Claude verbinden → Andere MCP-Clients*.
 

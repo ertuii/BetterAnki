@@ -4,8 +4,9 @@
   import Editor from './Editor.svelte'
   import CardFrame from './CardFrame.svelte'
 
-  // temporary: a pre-learn deck from the timeline, removed again when the session ends
-  let { deckId, deckName, flat, notify, onExit, temporary = false } = $props()
+  // temporary: a pre-learn/practice deck, removed again when the session ends
+  // plan: the study plan across all decks (nearest exam first) for `minutes`
+  let { deckId, deckName, flat, notify, onExit, temporary = false, plan = false, minutes = 0 } = $props()
 
   let card = $state(null)
   let done = $state(false)
@@ -19,10 +20,18 @@
   let advanceTimer
   let boxStart = Date.now()
   let boxCount = 0
+  const sessionStart = Date.now()
+  let answered = $state(0)
+  let timeUp = $state(false)
+  // svelte-ignore state_referenced_locally
+  let left = $state(minutes) // plan: minutes left, fixed per session
+
+  const fetchCard = () => (plan ? api.plan_next() : api.next_card(deckId))
 
   api.preferences().then((p) => (prefs = p.reviewing))
 
   const tick = setInterval(() => {
+    if (plan && minutes) left = Math.max(0, minutes - Math.floor((Date.now() - sessionStart) / 60000))
     if (!card || (revealed && card.study.stop_timer_on_answer)) return
     elapsed = Math.min(card.study.cap_secs, Math.floor((Date.now() - shownAt) / 1000))
   }, 1000)
@@ -60,7 +69,8 @@
   ]
 
   async function next() {
-    card = await api.next_card(deckId)
+    timeUp = plan && minutes > 0 && Date.now() - sessionStart >= minutes * 60000
+    card = timeUp ? null : await fetchCard()
     revealed = false
     done = !card
     shownAt = Date.now()
@@ -77,6 +87,7 @@
     try {
       await api.answer(card.card_id, ease)
       boxCount++
+      answered++
       if (prefs.time_limit_secs && Date.now() - boxStart >= prefs.time_limit_secs * 1000) {
         notify(`Zeitlimit erreicht: ${boxCount} Karten in ${Math.round((Date.now() - boxStart) / 60000)} Minuten`)
         boxStart = Date.now()
@@ -128,7 +139,7 @@
 
 <div class="study">
   <header>
-    <button class="plain" onclick={exit}><ArrowLeft size={17} />{deckName} <kbd>Esc</kbd></button>
+    <button class="plain" onclick={exit}><ArrowLeft size={17} />{deckName}{plan && card ? ` · ${card.deck}` : ''} <kbd>Esc</kbd></button>
     {#if card}
       <div class="mid">
         {#if prefs.show_remaining_due_counts}
@@ -138,6 +149,7 @@
             <span class="c-review" class:cur={card.queue === 2}>{card.counts.review}</span>
           </div>
         {/if}
+        {#if plan && minutes}<span class="timer num">noch {left} min</span>{/if}
         {#if card.study.show_timer}<span class="timer num" class:capped={elapsed >= card.study.cap_secs}>{clock(elapsed)}</span>{/if}
       </div>
       <div class="tools">
@@ -152,8 +164,13 @@
 
   {#if done}
     <div class="done">
-      <h1>{temporary ? 'Vorgelernt.' : 'Fertig für heute.'}</h1>
-      <p class="muted">{temporary ? 'Die Karten sind neu eingeplant. Lernkarten, die noch offen sind, kehren in ihre Stapel zurück.' : `In „${deckName}“ ist gerade nichts mehr fällig. Lernkarten kommen nach ihrer Lernstufe zurück.`}</p>
+      {#if plan}
+        <h1>{timeUp ? 'Lernplan geschafft.' : 'Alles erledigt.'}</h1>
+        <p class="muted">{answered} {answered === 1 ? 'Karte' : 'Karten'} in {Math.max(1, Math.round((Date.now() - sessionStart) / 60000))} Minuten. {timeUp ? 'Was noch fällig ist, kannst du später oder morgen lernen.' : 'In keinem Stapel ist gerade noch etwas fällig.'}</p>
+      {:else}
+        <h1>{temporary ? 'Geschafft.' : 'Fertig für heute.'}</h1>
+        <p class="muted">{temporary ? 'Die Karten sind neu eingeplant. Lernkarten, die noch offen sind, kehren in ihre Stapel zurück.' : `In „${deckName}“ ist gerade nichts mehr fällig. Lernkarten kommen nach ihrer Lernstufe zurück.`}</p>
+      {/if}
       <div class="row">
         <button onclick={exit}>Zur Übersicht</button>
         <button class="ghost" onclick={undo}>Letzte Antwort rückgängig</button>
@@ -186,7 +203,7 @@
   <div class="sheet-backdrop" onclick={(e) => e.target === e.currentTarget && (editing = false)} role="presentation">
     <div class="sheet" role="dialog" aria-label="Karte bearbeiten">
       <h2>Notiz bearbeiten</h2>
-      <Editor noteId={card.note_id} {flat} {notify} onSaved={async () => { editing = false; card = await api.next_card(deckId) }} onCancel={() => (editing = false)} />
+      <Editor noteId={card.note_id} {flat} {notify} onSaved={async () => { editing = false; card = await fetchCard() }} onCancel={() => (editing = false)} />
     </div>
   </div>
 {/if}

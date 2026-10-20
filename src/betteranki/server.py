@@ -48,6 +48,10 @@ class Handler(SimpleHTTPRequestHandler):
             if method.startswith("_") or method.startswith("pick_"):
                 raise ValueError(f"not allowed: {method}")
             body = {"result": getattr(self.core, method)(**req.get("args", {}))}
+            try:  # /rpc is Claude (MCP): show its changes, e.g. new cards in the inbox, right away
+                self.core._window and self.core._window.evaluate_js("window.__baRefresh && window.__baRefresh()")
+            except Exception:
+                pass  # window closing; the result still counts
         except Exception as e:
             body = {"error": f"{type(e).__name__}: {e}"}
         data = json.dumps(body).encode()
