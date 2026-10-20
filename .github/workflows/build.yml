@@ -37,7 +37,11 @@ jobs:
           $log = "$env:RUNNER_TEMP\selfcheck.txt"
           function Check($label) {
             Remove-Item $log -ErrorAction SilentlyContinue
-            $p = Start-Process $app -ArgumentList "--selfcheck", $log -Wait -PassThru
+            # direct start: the shell would refuse a marked exe here (for users: the "Run anyway" prompt)
+            $si = [System.Diagnostics.ProcessStartInfo]::new($app, "--selfcheck `"$log`"")
+            $si.UseShellExecute = $false
+            $p = [System.Diagnostics.Process]::Start($si)
+            $p.WaitForExit()
             Write-Host "$label -> exit $($p.ExitCode)"
             if (Test-Path $log) { Get-Content $log | Write-Host }
             return $p.ExitCode
