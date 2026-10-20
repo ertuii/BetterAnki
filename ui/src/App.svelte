@@ -26,6 +26,7 @@
 
   const checkUpdate = (manual = false) => api.check_update(manual).then((u) => (update = u))
   checkUpdate().catch(() => {})
+  api.update_failure().then((why) => why && notify(`Update fehlgeschlagen, die bisherige Version läuft weiter: ${why}`, true))
 
   async function installUpdate() {
     updating = true

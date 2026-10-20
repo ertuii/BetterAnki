@@ -1262,6 +1262,12 @@ class Core:
 
         return updater.check(manual)
 
+    def update_failure(self) -> str | None:
+        """Why the last update had to keep the old version, once, if it did."""
+        from . import updater
+
+        return updater.take_failure()
+
     def install_update(self) -> None:
         """Downloads the update, then quits; a helper swaps the app and starts it again."""
         from . import updater

@@ -9,6 +9,7 @@ import threading
 import zipfile
 from pathlib import Path
 
+os.environ["BETTERANKI_DIR"] = tempfile.mkdtemp()  # the swap helper reports failures into the data folder
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 from betteranki import updater  # noqa: E402
 
@@ -90,6 +91,7 @@ if sys.platform == "win32":
         if (app / "new.txt").exists() and not staging.exists():
             break
         time.sleep(0.5)
-    assert (app / "new.txt").exists() and not (app / "old.txt").exists(), sorted(p.name for p in app.parent.iterdir())
+    assert (app / "new.txt").exists() and not (app / "old.txt").exists(), (updater.take_failure(), sorted(p.name for p in app.parent.iterdir()))
+    assert updater.take_failure() is None
 
 print("updater ok")
