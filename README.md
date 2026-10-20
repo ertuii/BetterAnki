@@ -76,12 +76,18 @@ Für andere MCP-Clients steht der Startbefehl unter *Einstellungen → Claude ve
 
 ## Tastatur
 
-Heute: `Leertaste` lernen, `A` hinzufügen. Lernen: `Leertaste` aufdecken / Gut, `1–4` bewerten, `E` bearbeiten, `-` zurückstellen, `⌘Z` rückgängig, `Esc` zurück. Editor: `⌘↵` speichern, `⌘⇧C` Lückentext.
+Unter Windows `Strg` statt `⌘`.
+
+- **Heute:** `Leertaste` lernen, `A` hinzufügen
+- **Lernen:** `Leertaste`/`↵` aufdecken, danach Gut · `1–4` bewerten · `E` bearbeiten · `-` zurückstellen · `@` Karte aussetzen · `!` Notiz aussetzen · `A` automatisch weiter · `⌘Z` rückgängig · `Esc` zurück
+- **Editor:** `⌘↵` speichern · `⌘⇧C` Lückentext · `⌘V` Bild einfügen · `Esc` abbrechen
+- **Bild-Verdeckung:** Bereich auswählen, `⌫` löscht ihn
+- **Browser:** `⌘A` alle auswählen · `⌘`+Klick mehrere auswählen
 
 ## Test
 
 ```sh
-uv run python tests/test_core.py && uv run python tests/test_phase2.py && uv run python tests/test_phase3.py && uv run python tests/test_phase4.py
+for t in tests/test_*.py; do uv run python $t || break; done
 cd ui && npm run check
 ```
 

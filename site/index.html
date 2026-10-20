@@ -161,6 +161,7 @@ table.decks{width:100%;border-collapse:collapse;margin-top:22px;font-size:14px}
 .ledger dl div{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:20px;padding:14px 0;border-bottom:1px solid var(--rule)}
 .ledger dt{font-weight:650}
 .ledger dd{margin:0;color:var(--ink-2);font-size:16px}
+.keys{margin-top:40px}.keys dl div{grid-template-columns:minmax(110px,150px) minmax(0,1fr);align-items:center}
 
 /* claude */
 .prompts{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:10px}
@@ -223,6 +224,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 
     <a class="brand" href="#top"><img src="icon.svg" alt="" width="28" height="28">Muisti</a>
     <a href="#funktionen">Funktionen</a>
     <a href="#claude">Claude</a>
+    <a href="#tastatur">Tastatur</a>
     <a href="#installation">Installation</a>
     <a href="https://github.com/ertuii/Muisti">GitHub</a>
   </div>
@@ -330,7 +332,8 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 
           <div><dt>Planung</dt><dd>SM-2 und FSRS samt Optimierung, alle Stapel-Optionen und Voreinstellungen.</dd></div>
           <div><dt>Dateien</dt><dd>.apkg, .colpkg und CSV importieren und exportieren, auch per Drag &amp; Drop.</dd></div>
           <div><dt>Browser</dt><dd>Suche mit Anki-Syntax, Aussetzen, Markieren, Verschieben.</dd></div>
-          <div><dt>Notiztypen</dt><dd>Felder, Kartenvorlagen und CSS mit Live-Vorschau, Lückentext.</dd></div>
+          <div><dt>Notiztypen</dt><dd>Felder, Kartenvorlagen und CSS mit Live-Vorschau, Lückentext, Bild-Verdeckung, Antwort eintippen.</dd></div>
+          <div><dt>Formeln</dt><dd>LaTeX zwischen <code>\(…\)</code> und <code>\[…\]</code>, wie in Anki.</dd></div>
           <div><dt>Statistik</dt><dd>Wiederholungen, Prognose, Intervalle, Tageszeit, Antworttasten.</dd></div>
           <div><dt>Sync</dt><dd>Optional mit AnkiWeb, dazu automatische Sicherungen.</dd></div>
         </dl>
@@ -348,7 +351,44 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px 
         </dl>
       </div>
     </div>
-    <p class="caption" style="margin-top:28px">Noch nicht dabei: Bild-Verdeckung (Image Occlusion) und Add-ons.</p>
+    <p class="caption" style="margin-top:28px">Noch nicht dabei: Add-ons.</p>
+  </div>
+</section>
+
+<section class="band" id="tastatur">
+  <div class="wrap">
+    <h2>Alles geht mit der Tastatur.</h2>
+    <p class="intro">Unter Windows steht <kbd>Strg</kbd> für <kbd>⌘</kbd>.</p>
+    <div class="ledger keys">
+      <div>
+        <h3>Beim Lernen</h3>
+        <dl>
+          <div><dt><kbd>Leertaste</kbd> <kbd>↵</kbd></dt><dd>Antwort zeigen, danach mit „Gut“ bewerten</dd></div>
+          <div><dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt><dd>Nochmal, Schwer, Gut, Einfach</dd></div>
+          <div><dt><kbd>E</kbd></dt><dd>Notiz bearbeiten</dd></div>
+          <div><dt><kbd>-</kbd></dt><dd>Karte bis morgen zurückstellen</dd></div>
+          <div><dt><kbd>@</kbd></dt><dd>Karte aussetzen</dd></div>
+          <div><dt><kbd>!</kbd></dt><dd>Ganze Notiz aussetzen</dd></div>
+          <div><dt><kbd>A</kbd></dt><dd>Automatisch weiter an/aus (wenn in den Stapel-Optionen eingestellt)</dd></div>
+          <div><dt><kbd>⌘</kbd> <kbd>Z</kbd></dt><dd>Letzte Antwort rückgängig</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>Zurück zur Übersicht</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Überall sonst</h3>
+        <dl>
+          <div><dt><kbd>Leertaste</kbd></dt><dd>Heute: den nächsten fälligen Stapel lernen</dd></div>
+          <div><dt><kbd>A</kbd></dt><dd>Heute: Karten hinzufügen</dd></div>
+          <div><dt><kbd>⌘</kbd> <kbd>↵</kbd></dt><dd>Editor: speichern bzw. hinzufügen</dd></div>
+          <div><dt><kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>C</kbd></dt><dd>Editor: Markierung als Lückentext</dd></div>
+          <div><dt><kbd>⌘</kbd> <kbd>V</kbd></dt><dd>Editor: Bild einfügen, auch für die Bild-Verdeckung</dd></div>
+          <div><dt><kbd>⌫</kbd></dt><dd>Bild-Verdeckung: ausgewählten Bereich löschen</dd></div>
+          <div><dt><kbd>⌘</kbd> <kbd>A</kbd></dt><dd>Browser: alle Karten auswählen</dd></div>
+          <div><dt><kbd>⌘</kbd> + Klick</dt><dd>Browser: mehrere Karten auswählen</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>Editor oder Dialog schließen</dd></div>
+        </dl>
+      </div>
+    </div>
   </div>
 </section>
 
