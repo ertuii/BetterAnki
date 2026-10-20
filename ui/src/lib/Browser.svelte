@@ -93,6 +93,26 @@
 
   const bulk = async (fn, msg) => { await run(fn, msg); await search() }
 
+  const allSelected = $derived(rows.length > 0 && rows.every((r) => selected.has(r.card_id)))
+  function toggleAll() {
+    selected = allSelected ? new Set() : new Set(rows.map((r) => r.card_id))
+  }
+
+  let confirmReset = $state(false)
+  async function forget() {
+    if (!confirmReset) return (confirmReset = true)
+    confirmReset = false
+    await bulk(() => api.forget_cards(ids), (n) => `${n} ${n === 1 ? 'Karte' : 'Karten'} zurückgesetzt`)
+  }
+
+  function onKey(e) {
+    const typing = e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')
+    if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !typing) {
+      e.preventDefault()
+      selected = new Set(rows.map((r) => r.card_id))
+    }
+  }
+
   async function remove() {
     if (!confirmDelete) return (confirmDelete = true)
     confirmDelete = false
@@ -111,6 +131,8 @@
     untrack(search) // only the selects trigger this; typing goes through searchSoon
   })
 </script>
+
+<svelte:window onkeydown={onKey} />
 
 <div class="browser">
   <div class="list">
@@ -143,17 +165,18 @@
           <option value="">Verschieben nach</option>
           {#each flat as d}<option value={d.id}>{'\u2003'.repeat(d.depth)}{d.short}</option>{/each}
         </select>
+        <button class="ghost sm" onclick={forget} onblur={() => (confirmReset = false)} title="Karten wieder als neu einplanen (Anki: Vergessen)">{confirmReset ? 'Wirklich zurücksetzen?' : 'Zurücksetzen'}</button>
         <button class="danger sm" onclick={remove} onblur={() => (confirmDelete = false)}>{confirmDelete ? 'Wirklich löschen?' : 'Löschen'}</button>
         <button class="plain sm clear" aria-label="Auswahl aufheben" onclick={() => { selected = new Set(); active = null }}><X size={16} /></button>
       {:else}
-        <span class="muted hint">Klick wählt eine Karte, <kbd>⌘</kbd>-Klick mehrere.</span>
+        <span class="muted hint">Klick wählt eine Karte, <kbd>⌘</kbd>-Klick mehrere, <kbd>⌘A</kbd> alle.</span>
       {/if}
     </div>
 
     <div class="table-wrap" class:loading>
       <table>
         <thead>
-          <tr><th class="cb"></th><th>Sortierfeld</th><th class="c-deck">Stapel</th><th class="opt">Notiztyp</th><th class="opt">Tags</th><th class="r c-ivl">Intervall</th><th class="r c-reps opt">Wdh.</th></tr>
+          <tr><th class="cb"><input type="checkbox" checked={allSelected} indeterminate={selected.size > 0 && !allSelected} onclick={toggleAll} aria-label="Alle auswählen" /></th><th>Sortierfeld</th><th class="c-deck">Stapel</th><th class="opt">Notiztyp</th><th class="opt">Tags</th><th class="r c-ivl">Intervall</th><th class="r c-reps opt">Wdh.</th></tr>
         </thead>
         <tbody>
           {#each rows as r (r.card_id)}

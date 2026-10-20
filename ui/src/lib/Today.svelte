@@ -12,6 +12,7 @@
   let creating = $state(false)
   let newName = $state('')
   let confirmDelete = $state(null)
+  let confirmReset = $state(null)
   let filtered = $state(null) // form state for a new filtered deck
   let planMinutes = $state(30)
   let empty = $state(false) // no cards yet: offer to bring them over from Anki
@@ -71,6 +72,12 @@
     if (path) await run(() => api.export_deck(path, d.id, true, true), (n) => `${n} Notizen exportiert`)
   }
 
+  async function reset(d) {
+    if (confirmReset !== d.id) return (confirmReset = d.id)
+    menuFor = confirmReset = null
+    await run(() => api.reset_deck(d.id), (n) => `„${d.name}“: ${n} ${n === 1 ? 'Karte' : 'Karten'} wieder neu`)
+  }
+
   async function remove(d) {
     if (confirmDelete !== d.id) {
       confirmDelete = d.id
@@ -81,7 +88,7 @@
   }
 </script>
 
-<svelte:window onkeydown={onKey} onclick={(e) => !(e.target instanceof Element && e.target.closest('.menu-wrap')) && (menuFor = confirmDelete = null)} />
+<svelte:window onkeydown={onKey} onclick={(e) => !(e.target instanceof Element && e.target.closest('.menu-wrap')) && (menuFor = confirmDelete = confirmReset = null)} />
 
 <div class="today">
   <header>
@@ -180,6 +187,9 @@
                         <button class="plain" onclick={() => onOptions(d)}>Optionen</button>
                         <button class="plain" onclick={() => { creating = true; newName = d.name + '::'; menuFor = null }}>Unterstapel anlegen</button>
                         <button class="plain" onclick={() => exportDeck(d)}>Als .apkg exportieren</button>
+                        <button class="plain del" onclick={() => reset(d)} title="Alle Karten (auch in Unterstapeln) werden wieder neu, Lernverlauf bleibt in der Statistik">
+                          {confirmReset === d.id ? 'Wirklich alles zurücksetzen?' : 'Lernstand zurücksetzen'}
+                        </button>
                       {/if}
                       <button class="plain" onclick={() => { renaming = d.id; renameText = d.name; menuFor = null }}>Umbenennen</button>
                       <button class="plain del" onclick={() => remove(d)}>{confirmDelete === d.id ? 'Wirklich löschen?' : 'Löschen'}</button>

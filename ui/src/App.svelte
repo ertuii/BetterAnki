@@ -13,6 +13,7 @@
   import Inbox from './lib/Inbox.svelte'
   import Exams from './lib/Exams.svelte'
 
+  const mac = new URLSearchParams(location.search).has('mac') // title bar hidden, see app.py
   let view = $state(/** @type {any} */ ({ name: 'today' }))
   let decks = $state([])
   let overview = $state(null)
@@ -99,7 +100,8 @@
   window.addEventListener('focus', () => view.name === 'today' && refresh())
 </script>
 
-<div class="shell" class:studying={view.name === 'study'}>
+{#if mac}<div class="titlebar pywebview-drag-region" aria-hidden="true"></div>{/if}
+<div class="shell" class:mac class:studying={view.name === 'study'}>
   <aside>
     <div class="brand"><img src="/icon.svg" alt="" width="28" height="28" />BetterAnki</div>
     <nav>
@@ -182,6 +184,10 @@
 <style>
   .shell { display: grid; grid-template-columns: 248px 1fr; height: 100%; transition: grid-template-columns 240ms var(--ease); }
   .shell.studying { grid-template-columns: 0 1fr; }
+  /* macOS without title bar: the window buttons sit above the rail, the strip on top moves the window */
+  .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 28px; z-index: 15; }
+  .mac aside { padding-top: 48px; }
+  .mac main { padding-top: 28px; }
   .shell.studying aside { opacity: 0; pointer-events: none; }
   aside {
     border-right: 1px solid var(--rule);

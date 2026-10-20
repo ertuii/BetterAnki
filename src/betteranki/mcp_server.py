@@ -131,6 +131,12 @@ def suspend_cards(card_ids: list[int], suspended: bool = True) -> None:
 
 
 @mcp.tool()
+def reset_cards(card_ids: list[int]) -> int:
+    """Reset cards to new (forget their study progress). Only on the user's explicit request."""
+    return call("forget_cards", card_ids=card_ids)
+
+
+@mcp.tool()
 def card_info(card_id: int) -> str:
     """Review history and scheduling details of a card (HTML)."""
     return call("card_info", card_id=card_id)

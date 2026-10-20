@@ -898,6 +898,17 @@ class Core:
         self._col.set_user_flag_for_cards(flag, card_ids)
 
     @_locked
+    def forget_cards(self, card_ids: list[int]) -> int:
+        """Anki's 'Forget': back to new, original position and review/lapse counts reset. Undoable."""
+        self._col.sched.schedule_cards_as_new(card_ids, restore_position=True, reset_counts=True)
+        return len(card_ids)
+
+    @_locked
+    def reset_deck(self, deck_id: int) -> int:
+        """Reset the study progress of a deck and its subdecks."""
+        return self.forget_cards(self._col.decks.cids(deck_id, children=True))
+
+    @_locked
     def move_cards(self, card_ids: list[int], deck) -> None:
         deck_id = deck if isinstance(deck, int) else self._col.decks.id(deck)
         self._col.set_deck(card_ids, deck_id)

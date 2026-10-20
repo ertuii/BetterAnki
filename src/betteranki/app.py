@@ -1,4 +1,5 @@
 import json
+import sys
 
 import webview
 from webview.dom import DOMEventHandler
@@ -7,8 +8,24 @@ from . import claude_connect, server
 from .core import Core
 
 
+def _hide_titlebar(window):
+    """macOS: no title bar, the page reaches up to the window buttons (the UI keeps a drag strip there)."""
+    import AppKit
+    from PyObjCTools import AppHelper
+
+    def apply():
+        w = window.native
+        w.setTitleVisibility_(AppKit.NSWindowTitleHidden)
+        w.setTitlebarAppearsTransparent_(True)
+        w.setStyleMask_(w.styleMask() | AppKit.NSWindowStyleMaskFullSizeContentView)
+
+    AppHelper.callAfter(apply)  # AppKit only from the main thread
+
+
 def _bind(window):
-    """Runs once the window is up: file drag & drop and keeping Claude's paths current."""
+    """Runs once the window is up: title bar, file drag & drop and keeping Claude's paths current."""
+    if sys.platform == "darwin":
+        _hide_titlebar(window)
 
     def on_drop(e):
         # pywebview only hands out real file paths to Python-side drop handlers
@@ -23,7 +40,7 @@ def _bind(window):
 
 def run():
     core = Core()
-    url = server.start(core)
+    url = server.start(core) + ("?mac" if sys.platform == "darwin" else "")  # the UI leaves room for the window buttons
     core._window = webview.create_window("BetterAnki", url, js_api=core, width=1200, height=820, min_size=(720, 540))
     try:
         webview.start(_bind, (core._window,))
