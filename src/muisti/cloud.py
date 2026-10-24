@@ -33,8 +33,10 @@ def _http(method: str, path: str, body=None, token: str | None = None, headers: 
     import certifi  # the frozen app can't find the system's root certificates (see updater._get)
 
     data = body if isinstance(body, bytes) else (json.dumps(body).encode() if body is not None else None)
-    req = urllib.request.Request(URL + path, data=data, method=method, headers={
-        "apikey": KEY, "Authorization": f"Bearer {token or KEY}", "Content-Type": "application/json", **(headers or {})})
+    base = {"apikey": KEY, "Authorization": f"Bearer {token or KEY}"}
+    if data is not None:  # Supabase rejects a JSON content type without a body (e.g. on DELETE)
+        base["Content-Type"] = "application/json"
+    req = urllib.request.Request(URL + path, data=data, method=method, headers={**base, **(headers or {})})
     try:
         with urllib.request.urlopen(req, timeout=60, context=ssl.create_default_context(cafile=certifi.where())) as r:
             raw = r.read()
@@ -149,10 +151,13 @@ def _push(col, token: str, device: str, crt: bool) -> int:
         f"select id from notetypes{where} union select ntid from templates{where}")]
     for r in decks + confs + nts:
         r["mod"] = r["data"].get("mod") or now
-    config = [{"key": k, "mod": m, "val": json.loads(bytes(v))} for k, m, v in col.db.all(f"select key, mtime_secs, val from config{where}")]
+    config = [{"key": k, "mod": m, "val": json.loads(bytes(v))} for k, m, v in col.db.all(f"select key, mtime_secs, val from config{where} and key != ?", GONE_NOTETYPES)]
     if crt:  # due days of reviews count from the collection's creation day: the web needs it
         config.append({"key": "_crt", "mod": 0, "val": col.crt})
 
+    # Anki keeps no grave for note types; Core.delete_notetype notes them here
+    for i in col.get_config(GONE_NOTETYPES, []):
+        nts.append({"id": i, "mod": now, "deleted": True})
     tomb = {0: cards, 1: notes, 2: decks}
     for oid, kind in col.db.all("select oid, type from graves where usn = -1"):
         if kind in tomb:
@@ -175,20 +180,25 @@ def _push(col, token: str, device: str, crt: bool) -> int:
     for t in LOCAL_TABLES + ("templates",):
         col.db.execute(f"update {t} set usn = 0 where usn = -1")
     col.db.execute("delete from graves where usn = -1")
+    if col.get_config(GONE_NOTETYPES, None) is not None:
+        col.remove_config(GONE_NOTETYPES)
     return sent
 
 
+GONE_NOTETYPES = "muisti.goneNotetypes"
 LOCAL_TABLES = ("notes", "cards", "revlog", "decks", "deck_config", "notetypes", "config")
 
 
-def _apply(col, pulled: dict) -> int:
+def _apply(col, pulled: dict, first: bool = False) -> int:
     """Write what other devices changed into the local collection, without marking it as a local change.
-    A local change not sent yet wins if it is newer, a local deletion not sent yet always wins."""
+    A local change not sent yet wins if it is newer, a local deletion not sent yet always wins.
+    first: this device's first sync; whatever the account already has wins (a fresh collection's default
+    preset, deck and settings must not overwrite the account's)."""
     def pending(sql):
         return dict(col.db.all(sql))
 
     gone = {(k, oid) for oid, k in col.db.all("select oid, type from graves where usn = -1")}
-    local = {
+    local = {} if first else {
         "notes": pending("select id, mod from notes where usn = -1"),
         "cards": pending("select id, mod from cards where usn = -1"),
         "decks": pending("select id, mtime_secs from decks where usn = -1"),
@@ -217,12 +227,17 @@ def _apply(col, pulled: dict) -> int:
     for r in take("deck_configs"):
         if not r["deleted"]:
             col._backend.add_or_update_deck_config_legacy(json.dumps({**r["data"], "usn": 0}).encode())
+            # this call can't preserve usn/mtime: without this the preset would echo back as a local change
+            col.db.execute("update deck_config set usn = 0, mtime_secs = ? where id = ?", r["mod"], r["id"])
     gone_decks = []
     for r in take("decks"):
         if r["deleted"]:
             gone_decks.append(r["id"])
         else:
             col._backend.add_or_update_deck_legacy(deck=json.dumps({**r["data"], "usn": 0}).encode(), preserve_usn_and_mtime=True)
+    for r in take("notetypes"):
+        if r["deleted"] and col.models.get(r["id"]):
+            col.models.remove(r["id"])
     nts = [r for r in take("notetypes") if not r["deleted"]]
     twins = _park_twins(col, {r["data"]["name"]: r["id"] for r in nts})
     for r in nts:
@@ -307,8 +322,12 @@ def sync_media(col, account: Account) -> int:
 TABLES = ("config", "deck_configs", "decks", "notetypes", "notes", "cards", "revlog")
 
 
-def sync(col, account: Account) -> dict:
-    """Pull what other devices changed, then push the local changes. Returns {'sent': n, 'received': m}."""
+def sync(col, account: Account, pull: bool = True) -> dict:
+    """Pull what other devices changed, then push the local changes. Returns {'sent': n, 'received': m}.
+    pull=False only pushes (the web worker right after its own change, having pulled just before)."""
+    if not pull:
+        d = account.load()
+        return {"sent": _push(col, account.token(), d["device"], crt=False), "received": 0}
     token = account.token()
     d = account.load()
     state = _http("GET", "/rest/v1/sync_state?select=usn,schema", token=token)
@@ -319,8 +338,11 @@ def sync(col, account: Account) -> dict:
         for t in LOCAL_TABLES:
             col.db.execute(f"update {t} set usn = -1")
     since = d.get("last_usn") or 0
-    pulled = {t: _pull(token, t, since, d["device"]) for t in TABLES}
-    received = _apply(col, pulled)
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(len(TABLES)) as pool:  # one request per table, all at once
+        pulled = dict(zip(TABLES, pool.map(lambda t: _pull(token, t, since, d["device"]), TABLES)))
+    received = _apply(col, pulled, first)
     sent = _push(col, token, d["device"], crt=first and not any(r["key"] == "_crt" for r in pulled["config"]))
     # not the newest usn online: another device may have written since, and our own rows are skipped anyway
     account.set(last_usn=max([since] + [r["usn"] for rows in pulled.values() for r in rows]))

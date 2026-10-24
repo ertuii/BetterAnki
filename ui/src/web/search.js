@@ -1,6 +1,6 @@
-// A subset of Anki's search syntax for the web browser: words and "quoted phrases" (in any field), deck:, tag:,
-// note:, is:new|learn|review|due|suspended|buried, flag:N, prop:ivl/due/reps/lapses with < > =, -negation.
-// All terms must match (AND). ponytail: no OR, no parentheses, no regex; the desktop has Anki's full search.
+// The common part of Anki's search syntax, answered in the browser: words and "quoted phrases" (in any field),
+// deck:, tag:, note:, is:new|learn|review|due|suspended|buried, flag:N, prop:ivl/due/reps/lapses, -negation,
+// all terms ANDed. Anything else (OR, brackets, field:, rated:, re: …) goes to Anki's own search on the worker.
 import { stripHtml } from './render.js'
 
 const fold = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
@@ -50,9 +50,17 @@ function matcher({ key, val }, ctx) {
   }
 }
 
-/** Cards matching `query`, sorted by the notes' sort field like Anki's default browser order. */
+const KEYS = new Set(['deck', 'tag', 'note', 'flag', 'is', 'prop'])
+const IS = new Set(['new', 'learn', 'review', 'due', 'suspended', 'buried'])
+
+/** Cards matching `query`, sorted by the notes' sort field like Anki's default browser order.
+ * null when the query needs more than this subset (OR, brackets, field search, …): ask Anki itself then. */
 export function search(query, ctx) {
-  const tests = terms(query.trim()).map((t) => ({ neg: t.neg, fn: matcher(t, ctx) }))
+  const parsed = terms(query.trim())
+  const simple = !/[()]/.test(query) && parsed.every((t) =>
+    t.key ? KEYS.has(t.key) && (t.key !== 'is' || IS.has(t.val.toLowerCase())) : !/^(or|and)$/i.test(t.val))
+  if (!simple) return null
+  const tests = parsed.map((t) => ({ neg: t.neg, fn: matcher(t, ctx) }))
   const out = []
   for (const c of ctx.S.cards.values()) {
     const note = ctx.S.notes.get(c.nid)

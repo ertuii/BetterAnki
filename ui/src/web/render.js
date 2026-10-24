@@ -14,19 +14,79 @@ const SPEAKER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" str
   'stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>' +
   '<path d="M19 5a10 10 0 0 1 0 14"/></svg>'
 
-// {{c1::text::hint}}; ponytail: no nested clozes, they are rare and Anki's desktop still renders them
-const CLOZE = /\{\{c(\d+)::([\s\S]*?)(?:::([\s\S]*?))?\}\}/g
+// {{c1::text::hint}}, nested ones too, and image occlusion's {{c1::image-occlusion:rect:left=.1:…}}
+function parseCloze(text) {
+  const root = { kids: [] }
+  const stack = [root]
+  const re = /\{\{c(\d+)::|\}\}/g
+  let last = 0
+  for (let m; (m = re.exec(text));) {
+    const top = stack[stack.length - 1]
+    if (m[1]) {
+      top.kids.push(text.slice(last, m.index))
+      const node = { n: Number(m[1]), kids: [] }
+      top.kids.push(node)
+      stack.push(node)
+    } else if (stack.length > 1) { // "}}" closing a cloze; others are plain text
+      top.kids.push(text.slice(last, m.index))
+      stack.pop()
+    } else top.kids.push(text.slice(last, m.index + 2))
+    last = re.lastIndex
+  }
+  stack[stack.length - 1].kids.push(text.slice(last))
+  // the hint: "::" in the cloze's own text (not in a nested one)
+  const hint = (node) => {
+    for (const [i, k] of node.kids.entries()) {
+      if (typeof k !== 'string') continue
+      const at = k.indexOf('::')
+      if (at >= 0) {
+        node.hint = [k.slice(at + 2), ...node.kids.slice(i + 1).map((x) => (typeof x === 'string' ? x : ''))].join('')
+        node.kids = [...node.kids.slice(0, i), k.slice(0, at)]
+        break
+      }
+    }
+    node.kids.forEach((k) => typeof k !== 'string' && hint(k))
+  }
+  root.kids.forEach((k) => typeof k !== 'string' && hint(k))
+  return root.kids
+}
 
 export function clozeNumbers(text) {
-  return [...String(text).matchAll(CLOZE)].map((m) => Number(m[1]))
+  const out = []
+  const walk = (kids) => kids.forEach((k) => typeof k !== 'string' && (out.push(k.n), walk(k.kids)))
+  walk(parseCloze(String(text)))
+  return out
+}
+
+function occlusion(body, cls, n) {
+  const [, shape, ...props] = body.split(':')
+  const attrs = props.map((p) => {
+    const [k, v] = p.split('=')
+    return k === 'oi' ? `data-occludeInactive="${esc(v)}"` : `data-${k}="${esc(v)}"`
+  })
+  return `<div class="${cls}" data-ordinal="${n}" data-shape="${esc(shape)}" ${attrs.join(' ')} ></div>`
 }
 
 function cloze(text, ord, side) {
-  return String(text).replace(CLOZE, (_, n, body, hint) => {
-    if (Number(n) !== ord) return `<span class="cloze-inactive" data-ordinal="${n}">${body}</span>`
-    if (side === 'a') return `<span class="cloze" data-ordinal="${n}">${body}</span>`
-    return `<span class="cloze" data-cloze="${esc(body)}" data-ordinal="${n}">[${hint ?? '...'}]</span>`
-  })
+  const render = (kids) => kids.map((k) => {
+    if (typeof k === 'string') return k
+    const body = render(k.kids)
+    const active = k.n === ord
+    if (body.startsWith('image-occlusion:')) return occlusion(body, active ? (side === 'q' ? 'cloze' : 'cloze-highlight') : 'cloze-inactive', k.n)
+    if (!active) return `<span class="cloze-inactive" data-ordinal="${k.n}">${body}</span>`
+    if (side === 'a') return `<span class="cloze" data-ordinal="${k.n}">${body}</span>`
+    return `<span class="cloze" data-cloze="${esc(body)}" data-ordinal="${k.n}">[${k.hint ?? '...'}]</span>`
+  }).join('')
+  return render(parseCloze(String(text)))
+}
+
+/** The active cloze's texts (nested clozes as plain text), for {{cloze-only:}} and typing in a cloze. */
+export function clozeTexts(text, ord) {
+  const flat = (kids) => kids.map((k) => (typeof k === 'string' ? k : flat(k.kids))).join('')
+  const out = []
+  const walk = (kids) => kids.forEach((k) => typeof k !== 'string' && (k.n === ord && out.push(flat(k.kids)), walk(k.kids)))
+  walk(parseCloze(String(text)))
+  return out
 }
 
 let hintId = 0
@@ -37,7 +97,7 @@ const FILTERS = {
     return `<a class=hint href="#"\nonclick="this.style.display='none';\ndocument.getElementById('${id}').style.display='block';\nreturn false;" draggable=false>\n${esc(name)}</a>\n<div id="${id}" class=hint style="display: none">${v}</div>\n`
   },
   cloze: (v, _, ctx) => cloze(v, ctx.ord + 1, ctx.side),
-  'cloze-only': (v, _, ctx) => [...String(v).matchAll(CLOZE)].filter((m) => Number(m[1]) === ctx.ord + 1).map((m) => m[2]).join(', '),
+  'cloze-only': (v, _, ctx) => clozeTexts(v, ctx.ord + 1).join(', '),
 }
 
 function field(spec, ctx) {

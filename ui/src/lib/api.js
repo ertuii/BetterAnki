@@ -14,8 +14,8 @@ export const api = new Proxy({}, {
   get: (_, name) => async (...args) => {
     if (web) {
       const core = await webCore
-      if (typeof core[name] !== 'function') throw new Error('Gibt es im Web noch nicht, nutze dafür die Desktop-App.')
-      return core[name](...args)
+      // what the browser can't do itself runs on the worker, with Anki's own engine (web-api/worker.py)
+      return typeof core[name] === 'function' ? core[name](...args) : core.worker(name, args)
     }
     await ready
     return pw().api[name](...args)

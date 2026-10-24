@@ -351,6 +351,9 @@ class Core:
     @_locked
     def delete_notetype(self, notetype_id: int) -> None:
         self._col.models.remove(notetype_id)
+        from .cloud import GONE_NOTETYPES  # the next sync removes it on the other devices too
+
+        self._col.set_config(GONE_NOTETYPES, [*self._col.get_config(GONE_NOTETYPES, []), notetype_id])
 
     @_locked
     def preview_template(self, data: dict, template_index: int) -> dict:
@@ -1233,7 +1236,11 @@ class Core:
     @_locked
     def export_collection(self, path: str, media: bool = True) -> None:
         """Whole collection as .colpkg (for moving to another computer or Anki itself)."""
-        self._col.export_collection_package(path, include_media=media, legacy=False)
+        try:
+            self._col.export_collection_package(path, include_media=media, legacy=False)
+        finally:
+            self._col.reopen()  # Anki closes the collection for this export and leaves reopening to the caller
+            self._current = None
 
     # ---------- migration from Anki desktop ----------
 

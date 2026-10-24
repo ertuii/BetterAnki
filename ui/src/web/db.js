@@ -156,6 +156,7 @@ async function send() {
 }
 
 export const unsynced = () => pending.length
+export const userId = () => uid
 
 // ---------- media (private bucket, one folder per user) ----------
 

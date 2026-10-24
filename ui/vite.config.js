@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
             writeFileSync(`${outDir}/version.json`, JSON.stringify({ version }))
             // Vercel serves the folder as is: never cache the entry points, hashed assets forever
             writeFileSync(`${outDir}/vercel.json`, JSON.stringify({
+              // the worker (web-api/, added by web-api/bundle.sh): a cold start pulls a whole collection once
+              functions: { 'api/worker.py': { maxDuration: 300, excludeFiles: '{assets/**,katex/**,index.html,icon.svg,version.json}' } },
               headers: [
                 { source: '/(index.html|version.json)?', headers: [{ key: 'Cache-Control', value: 'no-store' }] },
                 { source: '/assets/(.*)', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
@@ -30,6 +32,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
+    // local web test: `npm run build:web && npx vite preview --mode web --outDir dist-web` plus
+    // `PYTHONPATH=src uv run python web-api/dev.py` for the worker
+    preview: { proxy: { '/api': 'http://127.0.0.1:4322' } },
     define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(version) },
     build: { outDir, emptyOutDir: true },
   }

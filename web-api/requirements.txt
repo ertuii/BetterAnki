@@ -1,0 +1,9 @@
+# the worker's dependencies besides anki itself, versions as in uv.lock.
+# anki is unpacked by bundle.sh: its Linux wheel is tagged glibc 2.35, Vercel has 2.34, the library needs only 2.34
+protobuf==7.36.2
+orjson==3.13.0
+requests==2.34.2
+markdown==3.11.2
+decorator==5.3.1
+typing-extensions==4.16.0
+certifi==2026.10.19

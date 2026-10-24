@@ -61,7 +61,7 @@
       <h2>Importieren</h2>
       <button class="plain sm" aria-label="Schließen" onclick={onClose}><X size={18} /></button>
     </header>
-    <p class="file">{path.split(/[\\/]/).pop()}</p>
+    <p class="file">{path.split(/[\\/]/).pop().replace(/^storage:[0-9a-f]{8}-/, '')}</p>
 
     {#if error}
       <p class="err" role="alert">{error}</p>

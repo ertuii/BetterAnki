@@ -127,8 +127,8 @@
       <button class="nav" class:on={view.name === 'today'} onclick={() => go('today')}><CalendarDays size={17} />Heute</button>
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
-      {#if !web}<button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>{/if}
-      {#if overview?.features.exams && !web}
+      <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
+      {#if overview?.features.exams}
         <button class="nav" class:on={view.name === 'exams'} onclick={() => go('exams')}><GraduationCap size={17} />Prüfungen</button>
       {/if}
       {#if overview?.inbox || view.name === 'inbox'}
@@ -153,9 +153,9 @@
         <button class="sm" disabled={updating} onclick={installUpdate}>{updating ? 'Lade Update …' : 'Aktualisieren'}</button>
       </div>
     {/if}
-    {#if !web}<button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>{/if}
+    <button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>
     <button class="nav foot" class:on={view.name === 'settings'} onclick={() => go('settings')}><Gear size={17} />Einstellungen</button>
-    {#if !web}<button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>{/if}
+    <button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>
   </aside>
 
   <main>
@@ -188,9 +188,14 @@
 {/if}
 
 <svelte:window
-  ondragover={(e) => { if (web || !e.dataTransfer?.types.includes('Files')) return; e.preventDefault(); dragging = true }}
+  ondragover={(e) => { if (!e.dataTransfer?.types.includes('Files')) return; e.preventDefault(); dragging = true }}
   ondragleave={(e) => !e.relatedTarget && (dragging = false)}
-  ondrop={(e) => { e.preventDefault(); dragging = false }} />
+  ondrop={(e) => {
+    e.preventDefault()
+    dragging = false
+    const file = web && e.dataTransfer?.files?.[0] // the desktop gets the path from app.py instead
+    if (file) api.upload_import(file).then((p) => (importing = p), (err) => notify(String(err?.message ?? err), true))
+  }} />
 
 {#if dragging}
   <div class="drop" aria-hidden="true"><div>Zum Importieren loslassen<span>.apkg, .colpkg oder CSV</span></div></div>

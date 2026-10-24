@@ -57,9 +57,17 @@ test('queue: learning due now first, then reviews, then new, within limits', () 
     { ...newCard, id: 6, type: 2, queue: 2, due: t.today + 3 }, // not due
     { ...newCard, id: 7, queue: -1 }, // suspended
   ]
-  const q = queue(cards, { new: 1, review: 10 }, t)
+  const lim = { new: 1, review: 10 }
+  const q = queue(cards, () => [lim], t)
   assert.deepEqual(q.cards.map((c) => c.id), [5, 4, 3])
   assert.deepEqual(q.counts, { new: 1, learn: 1, review: 1 })
+})
+
+test('queue: the limit of a parent deck caps its subdecks together', () => {
+  const parent = { new: 3, review: 9 }, a = { new: 2, review: 9 }, b = { new: 2, review: 9 }
+  const cards = [1, 2, 3, 4, 5, 6].map((id) => ({ ...newCard, id, due: id, did: id <= 3 ? 10 : 11 }))
+  const q = queue(cards, (c) => [c.did === 10 ? a : b, parent], t)
+  assert.deepEqual(q.cards.map((c) => c.id), [1, 2, 4]) // a's own limit 2, then the parent's 3 in total
 })
 
 test('limits count what was done today', () => {

@@ -76,5 +76,9 @@ assert "cloze-highlight" in card["answer"]
 assert len(col.find_cards('"deck:Anatomie"')) == 2
 assert len([t for t in core.note_types() if t["io"]]) == 1  # created once
 
+# exporting the whole collection: Anki closes it for that, the app must keep working afterwards
+core.export_collection(str(Path(tempfile.mkdtemp()) / "alles.colpkg"))
+assert core.decks() and core.next_card(col.decks.id("Anatomie"))
+
 core._close()
 print("ok")

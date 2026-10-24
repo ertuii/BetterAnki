@@ -85,6 +85,34 @@ cloud.sync(col_a, acc_a)
 cloud.sync(col_b, acc_b)
 assert col_b.note_count() == 0 and col_b.card_count() == 0
 
+# a fresh device joining the account doesn't overwrite its settings with the defaults of a new collection
+conf = col_a.decks.get_config(1)
+conf["new"]["perDay"] = 7
+col_a.decks.save(conf)
+cloud.sync(col_a, acc_a)
+col_c, acc_c = device()
+cloud.sync(col_c, acc_c)
+assert col_c.decks.get_config(1)["new"]["perDay"] == 7
+cloud.sync(col_a, acc_a)
+assert col_a.decks.get_config(1)["new"]["perDay"] == 7
+
+# deleting a note type reaches the other devices
+sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
+nt = col_a.models.copy(col_a.models.by_name("Basic"))
+cloud.sync(col_a, acc_a)
+cloud.sync(col_b, acc_b)
+assert col_b.models.get(nt["id"])
+from muisti.core import Core  # noqa: E402
+
+core_a = Core.__new__(Core)
+core_a._col = col_a
+Core.delete_notetype.__wrapped__(core_a, nt["id"])
+cloud.sync(col_a, acc_a)
+cloud.sync(col_b, acc_b)
+assert not col_b.models.get(nt["id"])
+assert col_a.get_config(cloud.GONE_NOTETYPES, None) is None
+col_c.close()
+
 # everything is still a valid Anki collection
 for c in (col_a, col_b):
     problems, ok = c.fix_integrity()

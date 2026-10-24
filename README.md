@@ -62,8 +62,8 @@ Erste Installation bei Freunden (App ist nicht signiert): Mac – App einmal öf
 Muisti gibt es auch im Browser (Vercel), mit Konto (Supabase Auth). Die Karten liegen dann zusätzlich online, Zeile für Zeile wie in Ankis Datenbank (`supabase/migrations/`), jede Person sieht nur ihre eigenen (RLS).
 
 - **Desktop:** *Einstellungen → Muisti-Konto* anmelden. Muisti gleicht beim Start, alle 5 Minuten und beim Beenden ab. Ankis Regel: Die neuere Änderung gewinnt, gelöschte Karten verschwinden überall, Wiederholungen werden zusammengeführt. AnkiWeb-Sync und Muisti-Konto schließen sich aus.
-- **Web:** Heute, Lernen (FSRS über ts-fsrs bzw. SM-2), Hinzufügen/Bearbeiten, Browser (Teilmenge der Anki-Suche), Eingang. Statistik, Stapel-Optionen, Notiztypen, Bild-Verdeckung, Import/Export und Claude bleiben vorerst in der Desktop-App.
-- Entwicklung: `cd ui && npm run build:web && npx vite preview --mode web --outDir dist-web` (Supabase-Projekt steht in `ui/.env.web`).
+- **Web:** alles außer Claude/MCP und den reinen Desktop-Dingen (Sicherungen, Speicherort, AnkiWeb, Von Anki übernehmen; stattdessen .colpkg importieren). Lernen, Hinzufügen, Browser, Prüfungen und Lernplan laufen im Browser (FSRS über ts-fsrs bzw. SM-2, Limits auch übergeordneter Stapel, Geschwister zurückstellen). Was Ankis eigene Engine braucht – Statistik, Stapel-Optionen und FSRS-Optimierung, Notiztypen, gefilterte Stapel, Vorlernen/Üben, Import/Export, die volle Suche (ODER, Klammern, Feldsuche) – erledigt der **Worker** (`web-api/worker.py`, Vercel-Funktion): Er führt `core.py` selbst aus, auf einer Kopie der Sammlung, die er per Sync holt und zurückschreibt.
+- Entwicklung: `cd ui && npm run build:web && npx vite preview --mode web --outDir dist-web`, dazu den Worker mit `PYTHONPATH=src uv run python web-api/dev.py` (Supabase-Projekt steht in `ui/.env.web`).
 
 **Updates:** Der Tag `v<version>` (siehe *Updates ausrollen*) baut auch die Webapp und stellt sie auf Vercel online; offene Tabs zeigen dann „Aktualisieren“. Einmalig nötig:
 1. GitHub-Secret `VERCEL_TOKEN` (vercel.com → Account Settings → Tokens).

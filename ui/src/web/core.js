@@ -1,12 +1,15 @@
 // The web app's stand-in for src/muisti/core.py: same method names, same return shapes, so the Svelte views
-// work unchanged. Data lives in db.js (Supabase rows mirrored in memory). Methods the web doesn't have throw.
-import { S, write, pull, flush, sb, mediaUrls, uploadMedia, unsynced } from './db.js'
-import { renderCard, stripHtml, clozeNumbers, compareAnswer } from './render.js'
+// work unchanged. Data lives in db.js (Supabase rows mirrored in memory). Everything frequent runs here;
+// rarer actions that need Anki's own engine (statistics, deck options, note types, import/export, …) go to the
+// worker (web-api/worker.py), which runs core.py itself: api.js sends every method this file lacks there.
+import { S, write, pull, flush, sb, mediaUrls, uploadMedia, unsynced, userId } from './db.js'
+import { renderCard, stripHtml, clozeNumbers, clozeTexts, compareAnswer } from './render.js'
 import { timing, limits, queue, outcomes, label, revlogFor, isLeech } from './sched.js'
 import { search as runSearch } from './search.js'
 
 const INBOX_TAG = 'Claude-Eingang'
 const FEATURES = { exams: false, plan: false, weak: false, inbox: true }
+const EXAMS = 'betteranki.exams' // {deck_id: "YYYY-MM-DD"}, same key as the desktop
 const now = () => Math.floor(Date.now() / 1000)
 const cfg = (key, dflt) => (S.config.has(key) ? S.config.get(key).val : dflt)
 const setCfg = (key, val) => write('config', [{ key, val, mod: now() }])
@@ -39,11 +42,24 @@ function cardsIn(ids) {
   return [...S.cards.values()].filter((c) => ids.has(c.did))
 }
 
-function countsFor(id, tm) {
-  const d = deckOf(id)
-  const q = queue(cardsIn(subtree(id)), limits(d, confOf(d), tm.today), tm, cfg('collapseTime', 1200))
-  return q.counts
+/** For queue(): the remaining limits of a card's deck and all its parents (filtered decks have none). */
+function limitsFor(tm) {
+  const byName = new Map([...S.decks.values()].map((r) => [r.data.name, r.data]))
+  const left = new Map()
+  const of = (d) => {
+    if (!left.has(d.id)) left.set(d.id, limits(d, confOf(d), tm.today))
+    return left.get(d.id)
+  }
+  return (c) => {
+    const d = deckOf(c.did)
+    if (!d || d.dyn) return []
+    const parts = d.name.split('::')
+    return parts.map((_, i) => byName.get(parts.slice(0, parts.length - i).join('::'))).filter(Boolean).map(of)
+  }
 }
+
+const studyQueue = (deck_id, tm) => queue(cardsIn(subtree(deck_id)), limitsFor(tm), tm, cfg('collapseTime', 1200))
+const countsFor = (id, tm) => studyQueue(id, tm).counts
 
 export function decks() {
   const tm = t()
@@ -105,7 +121,7 @@ export function reset_deck(deck_id) {
 // ---------- studying ----------
 
 let current = null // {card, results, typed, shown}
-let lastAnswer = null // for undo
+let undoStack = [] // answers to take back, newest last
 
 const study = (conf) => ({
   autoplay: conf.autoplay ?? true, show_timer: !!conf.timer, stop_timer_on_answer: conf.stopTimerOnAnswer ?? false,
@@ -139,9 +155,7 @@ function typeAnswer(note, fields, ord, question, answer) {
   if (fld.startsWith('cloze:')) [isCloze, fld] = [true, fld.slice(6)]
   if (fld.startsWith('nc:')) [combining, fld] = [false, fld.slice(3)]
   if (!(fld in fields)) return [question.replace(TYPE, `<p>Feld „${fld}“ zum Eintippen gibt es nicht.</p>`), answer.replace(/\[\[type:.+?\]\]/g, ''), null]
-  const expected = isCloze
-    ? [...fields[fld].matchAll(/\{\{c(\d+)::([\s\S]*?)(?:::[\s\S]*?)?\}\}/g)].filter((x) => Number(x[1]) === ord + 1).map((x) => x[2]).join(', ')
-    : fields[fld]
+  const expected = isCloze ? clozeTexts(fields[fld], ord + 1).join(', ') : fields[fld]
   const input = '<input id="typeans" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">'
   return [question.replace(TYPE, input), answer.replace(TYPE, '[[typeans]]'), { expected, combining }]
 }
@@ -149,8 +163,7 @@ function typeAnswer(note, fields, ord, question, answer) {
 export async function next_card(deck_id) {
   const tm = t()
   const d = deckOf(deck_id)
-  const conf = confOf(d)
-  const q = queue(cardsIn(subtree(deck_id)), limits(d, conf, tm.today), tm, cfg('collapseTime', 1200))
+  const q = studyQueue(deck_id, tm)
   if (!q.cards.length) return (current = null)
   const card = q.cards[0]
   const note = S.notes.get(card.nid)
@@ -202,18 +215,21 @@ export function answer(card_id, ease) {
     const [day, n] = deck[field] ?? [tm.today, 0]
     saveDeck({ ...deck, [field]: [tm.today, (day === tm.today ? n : 0) + 1] })
   }
-  lastAnswer = { card: before, deck: deckBefore, log, note: noteAfter && note }
-  saveCards([card])
+  // Anki's "bury siblings": the note's other cards wait until tomorrow, as the preset says
+  const siblings = cardsOf(before.nid).filter((c) => c.id !== before.id && (
+    (c.queue === 0 && conf.new.bury) || (c.queue === 2 && conf.rev.bury) || (c.queue === 3 && conf.buryInterdayLearning)))
+  undoStack = [...undoStack.slice(-19), { card: before, deck: deckBefore, log, note: noteAfter && note, siblings }]
+  saveCards([card, ...siblings.map((c) => ({ ...c, queue: -2 }))])
   write('revlog', [log])
   if (noteAfter) write('notes', [noteAfter])
   current = null
 }
 
 export function undo() {
-  if (!lastAnswer) return null
-  const { card, deck, log, note } = lastAnswer
-  lastAnswer = null
-  saveCards([card])
+  const last = undoStack.pop()
+  if (!last) return null
+  const { card, deck, log, note, siblings } = last
+  saveCards([card, ...siblings])
   saveDeck(deck)
   write('revlog', [{ ...log, mod: 1, deleted: true }])
   if (note) write('notes', [{ ...note, mod: now() }])
@@ -253,7 +269,8 @@ function unburyIfNewDay() {
 
 // ---------- notes ----------
 
-export function note_types() {
+export async function note_types() {
+  if (![...S.notetypes.values()].some((r) => r.data.originalStockKind === 6)) await worker('note_types') // adds Anki's image occlusion type
   return [...S.notetypes.values()].map((r) => r.data).map((m) => ({
     id: m.id, name: m.name, fields: m.flds.map((f) => f.name), cloze: m.type === 1,
     basic: m.originalStockKind === 1, io: m.originalStockKind === 6,
@@ -265,7 +282,6 @@ function notetypeOf(notetype) {
   const m = typeof notetype === 'number' ? nt(notetype) : all.find((x) => x.name === notetype)
     ?? all.find((x) => x.originalStockKind === (notetype === 'Cloze' ? 5 : notetype === 'Basic' ? 1 : -1))
   if (!m) throw new Error(`unknown note type: ${notetype}`)
-  if (m.originalStockKind === 6) throw new Error('Bild-Verdeckung geht im Web noch nicht, nutze dafür die Desktop-App.')
   return m
 }
 
@@ -320,7 +336,7 @@ export async function duplicate_of(notetype, first_field, note_id = null) {
 export async function add_note(notetype, deck, fields, tags = [], inbox = false) {
   const m = notetypeOf(notetype)
   const flds = await Promise.all((Array.isArray(fields) ? fields : fieldList(m, fields)).map(toNames))
-  if (!stripHtml(flds[0]) && !/<img/i.test(flds[0])) throw new Error('first field must not be empty')
+  if (!flds[0].trim()) throw new Error('first field must not be empty')
   const did = typeof deck === 'number' ? deck : create_deck(deck)
   const ords = ordsFor(m, flds)
   if (!ords.length) throw new Error(m.type === 1 ? 'Kein Lückentext gefunden: markiere etwas mit {{c1::…}}.' : 'Diese Felder ergeben keine Karte.')
@@ -376,10 +392,12 @@ export async function add_media(filename, data_b64) {
 
 // ---------- browser ----------
 
-export function search(query = '', limit = 500) {
+export async function search(query = '', limit = 500) {
   const tm = t()
   const deckName = (id) => deckOf(id)?.name ?? '?'
-  return runSearch(query, { S, today: tm.today, deckName, nt }).slice(0, limit).map((c) => {
+  const found = runSearch(query, { S, today: tm.today, deckName, nt })
+  if (!found) return worker('search', [query, limit]) // OR, brackets, field search …: Anki's own search
+  return found.slice(0, limit).map((c) => {
     const note = S.notes.get(c.nid)
     const m = nt(note.mid)
     return {
@@ -476,16 +494,16 @@ export function overview(past_days = 126, future_days = 28) {
   const features_ = features()
   return {
     due, minutes: Math.round((due * (timeN ? timeSum / timeN / 1000 : 10)) / 60), streak,
-    retention: total ? Math.round((100 * passed) / total) : null, past, future, overdue: {},
-    features: features_, exams: [], inbox: inbox_count(),
+    retention: total ? Math.round((100 * passed) / total) : null, past, future, overdue: overdue(tm),
+    features: features_, exams: features_.exams ? exam_plan() : [], inbox: inbox_count(),
   }
 }
 
 // ---------- settings ----------
 
-export const features = () => ({ ...FEATURES, ...cfg('betteranki.features', {}), exams: false, plan: false, weak: false })
+export const features = () => ({ ...FEATURES, ...cfg('betteranki.features', {}) })
 export function save_features(f) {
-  setCfg('betteranki.features', { ...cfg('betteranki.features', {}), inbox: !!f.inbox })
+  setCfg('betteranki.features', Object.fromEntries(Object.keys(FEATURES).filter((k) => k in f).map((k) => [k, !!f[k]])))
 }
 export const theme = () => cfg('betteranki.theme', 'system')
 export const set_theme = (v) => setCfg('betteranki.theme', v)
@@ -539,6 +557,100 @@ export async function cloud_logout() {
   await flush().catch(() => {})
   await sb.auth.signOut()
   location.reload()
+}
+
+// ---------- exams & study plan (as core.py) ----------
+
+function overdue(tm) {
+  const out = {}
+  for (const r of S.decks.values()) {
+    if (r.data.name.includes('::')) continue
+    const n = cardsIn(subtree(r.id)).filter((c) => c.queue === 2 && c.due < tm.today).length
+    if (n) out[r.id] = n
+  }
+  return out
+}
+
+export function set_exam(deck_id, date) {
+  const exams = { ...cfg(EXAMS, {}) }
+  if (date) exams[String(deck_id)] = date
+  else delete exams[String(deck_id)]
+  setCfg(EXAMS, exams)
+}
+
+export function exam_plan() {
+  const midnight = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
+  const today = midnight(new Date())
+  return Object.entries(cfg(EXAMS, {})).sort((a, b) => a[1].localeCompare(b[1])).flatMap(([did, date]) => {
+    const d = deckOf(did)
+    if (!d) return [] // deck was deleted
+    const [y, m, dd] = date.split('-').map(Number)
+    const days = Math.round((Date.UTC(y, m - 1, dd) - today) / 864e5)
+    const newLeft = cardsIn(subtree(d.id)).filter((c) => c.queue === 0).length
+    const buffer = Math.min(7, Math.max(1, Math.floor(days / 5))) // the last fifth (1–7 days) is for reviewing
+    const perDay = newLeft && days > 0 ? Math.ceil(newLeft / Math.max(1, days - buffer)) : 0
+    return [{ deck_id: d.id, name: d.name, date, days, new_left: newLeft, per_day: perDay, current: d.newLimit ?? confOf(d).new.perDay, buffer }]
+  })
+}
+
+/** Next card of a session across all decks: decks with the nearest exam first, then the rest in order. */
+export async function plan_next() {
+  const exams = features().exams ? cfg(EXAMS, {}) : {}
+  const first = (d) => [...subtree(d.id)].map((i) => exams[String(i)]).filter(Boolean).sort()[0] ?? '9999'
+  const tops = decks().filter((d) => !d.filtered).sort((a, b) => first(a).localeCompare(first(b)))
+  for (const d of tops) {
+    const card = d.new + d.learn + d.review ? await next_card(d.id) : null
+    if (card) return { ...card, deck: d.name }
+  }
+  return null
+}
+
+// ---------- the worker: Anki's engine for the rarer actions ----------
+
+export async function worker(method, args = []) {
+  await flush() // the worker must see everything done here
+  const { data } = await sb.auth.getSession()
+  let body
+  try {
+    const r = await fetch('/api/worker', {
+      method: 'POST', body: JSON.stringify({ method, args }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session?.access_token}` },
+    })
+    body = r.status === 401 ? { error: 'Bitte melde dich neu an.' } : await r.json()
+  } catch {
+    throw new Error('Der Server ist gerade nicht erreichbar. Bitte versuch es gleich noch einmal.')
+  }
+  if (body.error) throw new Error(body.error)
+  await pull() // and the web what the worker changed
+  if (method.startsWith('export_')) await download(String(args[0]))
+  return body.result
+}
+
+// files travel through the user's storage folder: "storage:<name>" is _tmp/<name> there (see worker.py)
+const safeName = (n) => n.replace(/[^\p{L}\p{N}._-]+/gu, '_')
+
+export async function upload_import(file) {
+  const name = `${crypto.randomUUID().slice(0, 8)}-${safeName(file.name)}`
+  await uploadMedia(`_tmp/${name}`, file)
+  return `storage:${name}`
+}
+
+export function pick_import_file() {
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.apkg,.colpkg,.csv,.tsv,.txt' })
+    input.onchange = () => (input.files[0] ? upload_import(input.files[0]).then(resolve) : resolve(null))
+    input.oncancel = () => resolve(null)
+    input.click()
+  })
+}
+
+export const pick_export_file = (name, ext = 'apkg') => `storage:${safeName(name)}.${ext}`
+
+async function download(path) {
+  const name = path.replace(/^storage:/, '')
+  const { data, error } = await sb.storage.from('media').createSignedUrl(`${userId()}/_tmp/${name}`, 600, { download: name })
+  if (error) throw new Error(error.message)
+  Object.assign(document.createElement('a'), { href: data.signedUrl }).click()
 }
 
 // desktop only; the settings hide these in the web app

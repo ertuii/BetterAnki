@@ -1,7 +1,7 @@
 // Anki's scheduler for the web app: days since collection creation, study queue, FSRS (ts-fsrs) and SM-2.
 // Pure functions over plain rows (cards, deck dicts, preset dicts), so they run in tests without a browser.
-// ponytail: simplified v3 queue (learning due now, then reviews, then new; limits of the selected deck only,
-// no sibling burying, no new/review mixing options). Desktop keeps Anki's full scheduler.
+// ponytail: v3's order simplified (learning due now, then reviews, then new; no new/review mixing options,
+// no load balancing or easy days). Limits apply per deck and all its parents, like v3.
 import { fsrs, Rating, State, StrategyMode, ConvertStepUnitToMinutes } from 'ts-fsrs'
 
 const DAY = 86400
@@ -29,8 +29,12 @@ export function limits(deck, conf, today) {
   }
 }
 
-/** The cards to study in a deck tree, in order, plus the counts shown on the study screen. */
-export function queue(cards, lim, t, learnAhead = 1200) {
+/**
+ * The cards to study in a deck tree, in order, plus the counts shown on the study screen.
+ * limitsOf(card): the remaining-limit objects ({new, review}) of the card's deck and all its parents; a card is
+ * taken only while every one of them has room, and counts against all of them (Anki's v3 rule).
+ */
+export function queue(cards, limitsOf, t, learnAhead = 1200) {
   const lrnNow = [], lrnLater = [], rev = [], fresh = []
   for (const c of cards) {
     if (c.queue === 1) (c.due <= t.now ? lrnNow : c.due <= t.now + learnAhead ? lrnLater : null)?.push(c)
@@ -41,7 +45,13 @@ export function queue(cards, lim, t, learnAhead = 1200) {
   lrnLater.sort((a, b) => a.due - b.due)
   rev.sort((a, b) => a.due - b.due || a.id - b.id)
   fresh.sort((a, b) => a.due - b.due || a.id - b.id)
-  const reviews = rev.slice(0, lim.review), news = fresh.slice(0, lim.new)
+  const take = (list, kind) => list.filter((c) => {
+    const chain = limitsOf(c)
+    if (!chain.every((l) => l[kind] > 0)) return false
+    chain.forEach((l) => l[kind]--)
+    return true
+  })
+  const reviews = take(rev, 'review'), news = take(fresh, 'new')
   return {
     cards: [...lrnNow, ...reviews, ...news, ...lrnLater],
     counts: { new: news.length, learn: lrnNow.length + lrnLater.length, review: reviews.length },

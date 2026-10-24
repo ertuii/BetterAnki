@@ -425,6 +425,14 @@
   </section>
   {/if}
 
+  {#if web}
+  <section>
+    <h2>Export</h2>
+    <p class="muted">Deine ganze Sammlung mit Lernstand und Medien als Datei, zum Beispiel für Anki oder als eigene Sicherung.</p>
+    <div class="row"><button class="ghost" onclick={exportAll}>Ganze Sammlung exportieren (.colpkg)</button></div>
+  </section>
+  {/if}
+
   {#if !web}
   <section>
     <h2>Sicherungen</h2>
