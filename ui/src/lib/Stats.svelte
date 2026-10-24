@@ -223,7 +223,7 @@
   .facts div { display: flex; flex-direction: column; }
   dt { font-size: 22px; font-weight: 700; }
   dd { margin: 0; color: var(--ink-2); font-size: 13px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 40px 48px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 40px 48px; }
   section { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   section.wide { grid-column: 1 / -1; }
   .weak ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; max-width: 900px; }
@@ -240,4 +240,18 @@
   .hbar { display: flex; height: 14px; gap: 2px; border-radius: 4px; overflow: hidden; margin-bottom: 8px; background: var(--paper-3); }
   table.small td, table.small th { padding: 7px 10px; font-size: 13px; }
   .key { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 8px; vertical-align: -1px; }
+  @media (max-width: 860px) {
+    .stats { padding: 20px 16px 40px; gap: 24px; }
+    .filters { width: 100%; flex-wrap: wrap; }
+    .filters select { flex: 1 1 100%; width: auto; }
+    .seg { width: 100%; }
+    .seg button { flex: 1; padding: 0 6px; }
+    .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 12px; }
+    dt { font-size: 20px; }
+    .grid { gap: 32px; }
+    .weak li { grid-template-columns: minmax(0, 1fr) 56px 40px auto; gap: 10px; }
+    .weak .cnt { display: none; }
+    .kind { display: none; }
+    table.small td, table.small th { padding: 7px 6px; }
+  }
 </style>

@@ -285,4 +285,13 @@
   .range input { flex: 1; accent-color: var(--ink); height: auto; border: 0; padding: 0; }
   .range b { color: var(--ink); width: 44px; }
   .bar { display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; padding: 16px 0; background: var(--paper); border-top: 1px solid var(--rule); }
+  @media (max-width: 860px) {
+    .opts { padding: 12px 16px 0; gap: 22px; }
+    h1 { font-size: 22px; overflow-wrap: anywhere; }
+    .row { flex-wrap: wrap; }
+    .row select { width: auto; flex: 1 1 100%; }
+    .fields { grid-template-columns: minmax(0, 1fr); }
+    .bar { padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); }
+    .bar button { flex: 1; }
+  }
 </style>

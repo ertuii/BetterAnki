@@ -1,5 +1,5 @@
 <script>
-  import { ArrowUp, ArrowDown, X, Plus } from '@lucide/svelte'
+  import { ArrowUp, ArrowDown, ArrowLeft, X, Plus } from '@lucide/svelte'
   import { api } from './api.js'
   import CardFrame from './CardFrame.svelte'
 
@@ -17,6 +17,7 @@
   let confirmDelete = $state(false)
   let saving = $state(false)
   let previewTimer
+  let detail = $state(false) // phones: list or editor, one at a time
 
   const dirty = $derived(nt && JSON.stringify(nt) !== original)
 
@@ -28,7 +29,17 @@
   async function select(id) {
     if (id == null) return
     selId = id
-    nt = await api.notetype(id)
+    nt = null
+    try {
+      const got = await api.notetype(id)
+      if (selId !== id) return // another one was picked meanwhile
+      nt = got
+    } catch (e) {
+      if (selId !== id) return
+      selId = null
+      detail = false
+      return notify(String(e?.message ?? e), true)
+    }
     original = JSON.stringify(nt)
     tIndex = 0
     confirmDelete = false
@@ -98,12 +109,12 @@
   loadTypes()
 </script>
 
-<div class="nts">
+<div class="nts" class:detail>
   <aside class="list">
     <h1>Notiztypen</h1>
     <nav>
       {#each types as t (t.id)}
-        <button class="item" class:on={t.id === selId} onclick={() => select(t.id)}>{t.name}</button>
+        <button class="item" class:on={t.id === selId} onclick={() => { detail = true; select(t.id) }}>{t.name}</button>
       {/each}
     </nav>
     {#if creating === null}
@@ -117,6 +128,7 @@
 
   {#if nt}
     <section class="edit">
+      <button class="plain back" onclick={() => (detail = false)}><ArrowLeft size={17} />Alle Notiztypen</button>
       <div class="head">
         <input class="name" bind:value={nt.name} aria-label="Name des Notiztyps" />
         <span class="muted">{nt.use_count} {nt.use_count === 1 ? 'Notiz' : 'Notizen'}</span>
@@ -183,6 +195,13 @@
         <button disabled={!dirty || saving} onclick={save}>{saving ? 'Speichere …' : 'Speichern'}</button>
       </div>
     </section>
+  {:else if selId != null}
+    <section class="edit" aria-busy="true" aria-label="Notiztyp wird geladen">
+      <button class="plain back" onclick={() => (detail = false)}><ArrowLeft size={17} />Alle Notiztypen</button>
+      <span class="skel" style="width:280px;max-width:100%;height:var(--control-h)"></span>
+      <span class="skel" style="width:220px;height:30px"></span>
+      {#each Array(4) as _}<span class="skel" style="max-width:560px;height:var(--control-h)"></span>{/each}
+    </section>
   {/if}
 </div>
 
@@ -217,5 +236,20 @@
   .preview { border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; min-height: 340px; }
   .bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; position: sticky; bottom: 0; padding: 14px 0; background: var(--paper); border-top: 1px solid var(--rule); margin-top: auto; }
   .bar span { margin-right: auto; font-size: 13px; }
+  .back { display: none; }
   @media (max-width: 1000px) { .split { grid-template-columns: 1fr; } }
+  @media (max-width: 860px) {
+    .list { width: 100%; border-right: 0; padding: 20px 8px; }
+    .nts.detail .list, .nts:not(.detail) .edit { display: none; }
+    .item { min-height: 44px; font-size: 16px; }
+    .edit { padding: 12px 16px 0; }
+    .back { display: inline-flex; align-self: flex-start; margin-left: -8px; }
+    .head { flex-wrap: wrap; }
+    .name { flex: 1 1 100%; max-width: none; }
+    .tabs { overflow-x: auto; }
+    .tpl-bar select, .tname { width: auto; flex: 1 1 140px; }
+    .seg { margin-left: 0; }
+    .split { flex: none; }
+    .code, .preview { min-height: 260px; }
+  }
 </style>

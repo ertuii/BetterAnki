@@ -70,4 +70,8 @@
   .exam-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-top: 10px; }
   .exam-form select, .exam-form input { width: auto; }
   .small { font-size: 13px; margin-top: 6px; }
+  @media (max-width: 860px) {
+    .exams { padding: 20px 16px 40px; }
+    .exam-form select, .exam-form input { flex: 1 1 100%; }
+  }
 </style>

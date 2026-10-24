@@ -1,5 +1,5 @@
 <script>
-  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon, GraduationCap } from '@lucide/svelte'
+  import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon, GraduationCap, Ellipsis } from '@lucide/svelte'
   import { api, flatten, hueFor, total, web } from './lib/api.js'
   import Today from './lib/Today.svelte'
   import Study from './lib/Study.svelte'
@@ -129,10 +129,10 @@
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
       <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
       {#if overview?.features.exams}
-        <button class="nav" class:on={view.name === 'exams'} onclick={() => go('exams')}><GraduationCap size={17} />Prüfungen</button>
+        <button class="nav extra" class:on={view.name === 'exams'} onclick={() => go('exams')}><GraduationCap size={17} />Prüfungen</button>
       {/if}
       {#if overview?.inbox || view.name === 'inbox'}
-        <button class="nav" class:on={view.name === 'inbox'} onclick={() => go('inbox')}>
+        <button class="nav extra" class:on={view.name === 'inbox'} onclick={() => go('inbox')}>
           <InboxIcon size={17} />Eingang<span class="count num badge">{overview?.inbox || ''}</span>
         </button>
       {/if}
@@ -156,6 +156,18 @@
     <button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>
     <button class="nav foot" class:on={view.name === 'settings'} onclick={() => go('settings')}><Gear size={17} />Einstellungen</button>
     <button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>
+    <!-- phones: the tab bar holds five; the rest sits behind "Mehr" -->
+    <button class="nav more" popovertarget="more" class:on={['exams', 'inbox', 'notetypes', 'settings'].includes(view.name)}>
+      <Ellipsis size={17} />Mehr{#if overview?.inbox}<span class="count num badge">{overview.inbox}</span>{/if}
+    </button>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div id="more" popover class="menu" onclick={(e) => e.currentTarget.hidePopover()}>
+      {#if overview?.features.exams}<button class="plain" onclick={() => go('exams')}><GraduationCap size={18} />Prüfungen</button>{/if}
+      {#if overview?.inbox}<button class="plain" onclick={() => go('inbox')}><InboxIcon size={18} />Eingang<span class="count num badge">{overview.inbox}</span></button>{/if}
+      <button class="plain" onclick={() => go('notetypes')}><Shapes size={18} />Notiztypen</button>
+      <button class="plain" onclick={() => go('settings')}><Gear size={18} />Einstellungen</button>
+      <button class="plain" onclick={importFile}><Download size={18} />Importieren</button>
+    </div>
   </aside>
 
   <main>
@@ -252,6 +264,7 @@
   .drop span { font-size: 14px; font-weight: 500; color: var(--ink-2); }
   .toast.error { background: var(--m-red); color: #fff; }
   @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
+  .more, .menu { display: none; }
   /* phones and portrait tablets: the rail becomes a tab bar at the bottom; decks are listed on "Heute" anyway */
   @media (max-width: 860px) {
     .shell, .shell.studying { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
@@ -274,5 +287,15 @@
     .update { position: fixed; top: 8px; left: 8px; right: 8px; z-index: 30; margin: 0; flex-direction: row; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); }
     .page { padding: 20px 16px 32px; }
     .toast { bottom: calc(80px + env(safe-area-inset-bottom)); max-width: calc(100vw - 32px); }
+    .foot, .extra { display: none; }
+    .more { display: flex; }
+    .menu:popover-open {
+      display: flex; flex-direction: column; min-width: 220px; padding: 6px; margin: 0;
+      inset: auto 8px calc(68px + env(safe-area-inset-bottom)) auto;
+      background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 12px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.18);
+    }
+    .menu button { display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; font-size: 16px; font-weight: 500; border-radius: var(--radius); justify-content: flex-start; }
+    .menu button :global(svg) { color: var(--ink-2); }
+    .menu .badge { position: static; margin-left: auto; }
   }
 </style>
