@@ -246,4 +246,13 @@
   .empty { color: var(--ink-2); padding: 32px 12px; }
   .panel { width: min(420px, 40%); border-left: 1px solid var(--rule); padding: 24px 28px; overflow: auto; }
   @container (max-width: 640px) { .opt { display: none; } .c-deck { width: 32%; } .c-ivl { width: 64px; } }
+  @container (max-width: 420px) { .hint { display: none; } td { padding: 10px 6px; } .cb { width: 32px; } }
+  @media (max-width: 720px) {
+    .list { padding: 14px 12px 0; }
+    .filters select { flex: 1 1 140px; }
+    .count { width: 100%; margin: 0; }
+    .selection:not(.on) { display: none; }
+    /* the editor takes the whole screen; "Abbrechen" closes it */
+    .panel { position: fixed; inset: 0; z-index: 25; width: auto; border: 0; background: var(--paper); padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  }
 </style>

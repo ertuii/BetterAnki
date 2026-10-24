@@ -247,16 +247,27 @@
   .drop span { font-size: 14px; font-weight: 500; color: var(--ink-2); }
   .toast.error { background: var(--m-red); color: #fff; }
   @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
-  /* phones (web app): the rail becomes a scrollable bar on top; decks are listed on "Heute" anyway */
+  /* phones: the rail becomes a tab bar at the bottom; decks are listed on "Heute" anyway */
   @media (max-width: 720px) {
-    .shell, .shell.studying { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .shell, .shell.studying { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    main { grid-row: 1; }
+    aside {
+      grid-row: 2; flex-direction: row; align-items: stretch; gap: 0; overflow: visible;
+      padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); border-right: 0; border-top: 1px solid var(--rule);
+    }
     .shell.studying aside { display: none; }
-    aside { flex-direction: row; align-items: center; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--rule); }
-    aside nav { flex-direction: row; }
-    .brand { padding: 0 8px 0 0; }
-    .brand, .nav { white-space: nowrap; width: auto; }
-    .label, .decks { display: none; }
-    .update { margin: 0 8px; flex-direction: row; align-items: center; white-space: nowrap; }
-    .page { padding: 20px 16px; }
+    aside nav { display: contents; }
+    aside nav.decks, .brand, .label { display: none; }
+    .nav, .foot {
+      flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 3px; position: relative;
+      height: auto; padding: 6px 2px; font-size: 11px; font-weight: 500; text-align: center;
+    }
+    .nav.on { background: transparent; color: var(--ink); font-weight: 650; }
+    .nav.on :global(svg) { color: var(--ink); }
+    .nav :global(svg) { width: 20px; height: 20px; }
+    .badge { position: absolute; top: 2px; left: calc(50% + 6px); margin: 0; padding: 0 5px; font-size: 10px; }
+    .update { position: fixed; top: 8px; left: 8px; right: 8px; z-index: 30; margin: 0; flex-direction: row; align-items: center; justify-content: space-between; box-shadow: 0 6px 24px rgb(0 0 0 / 0.14); }
+    .page { padding: 20px 16px 32px; }
+    .toast { bottom: calc(80px + env(safe-area-inset-bottom)); max-width: calc(100vw - 32px); }
   }
 </style>

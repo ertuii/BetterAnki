@@ -578,4 +578,5 @@
   .state.outdated { background: var(--warn-bg); color: var(--warn-ink); }
   details summary { cursor: pointer; margin-bottom: 8px; }
   .choice b { overflow-wrap: anywhere; }
+  @media (max-width: 720px) { .settings { padding: 20px 16px 40px; gap: 20px; } .row span { overflow-wrap: anywhere; } }
 </style>

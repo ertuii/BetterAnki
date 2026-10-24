@@ -279,4 +279,20 @@
   .sheet { width: min(640px, 100%); height: 100%; background: var(--paper); padding: 28px 32px; overflow: auto; display: flex; flex-direction: column; gap: 20px; animation: slide 240ms var(--ease); }
   .sheet h2 { font-size: 20px; font-weight: 750; }
   @keyframes slide { from { transform: translateX(32px); opacity: 0; } }
+  @media (max-width: 720px) {
+    header { padding: 6px 6px 6px 2px; gap: 6px; }
+    header > :global(button:first-child) { min-width: 0; max-width: 34vw; overflow: hidden; text-overflow: ellipsis; }
+    .mid { gap: 10px; }
+    .counts { gap: 10px; }
+    .card-area { padding: 0; }
+    .card-area :global(iframe) { border-radius: 0; box-shadow: none; }
+    footer { padding: 10px 10px calc(10px + env(safe-area-inset-bottom)); }
+    .reveal { width: 100%; justify-content: center; height: 52px; }
+    .answers { grid-template-columns: repeat(4, 1fr); width: 100%; gap: 6px; }
+    .ans { padding: 10px 2px; }
+    .done { padding: 24px 16px; }
+    .done h1 { font-size: 32px; }
+    .row { flex-wrap: wrap; }
+    .sheet { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
+  }
 </style>

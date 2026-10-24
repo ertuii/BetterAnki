@@ -186,7 +186,10 @@
   </label>
 
   <div class="bar">
-    {#if type?.cloze}<span class="muted hint">Lückentext: Text markieren, <kbd>⌘⇧C</kbd></span>{/if}
+    {#if type?.cloze}
+      <!-- mousedown keeps the selection in the field; also the only way on a phone -->
+      <button type="button" class="ghost hint" onmousedown={(e) => e.preventDefault()} onclick={cloze} title="Markierten Text zur Lücke machen">Lücke setzen <kbd>⌘⇧C</kbd></button>
+    {/if}
     {#if onCancel}<button type="button" class="ghost" onclick={onCancel}>Abbrechen</button>{/if}
     <button type="submit" disabled={saving || !flat.length}>{noteId ? 'Speichern' : 'Hinzufügen'} <kbd class="inv">⌘↵</kbd></button>
   </div>
@@ -208,7 +211,7 @@
   .rich:focus { border-color: var(--ink); }
   .rich :global(img) { max-width: 100%; }
   .bar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
-  .hint { margin-right: auto; font-size: 13px; }
+  .hint { margin-right: auto; }
   .dupe { font-size: 13px; color: var(--m-red); }
   kbd.inv { color: var(--paper); border-color: color-mix(in srgb, var(--paper) 40%, transparent); }
 </style>

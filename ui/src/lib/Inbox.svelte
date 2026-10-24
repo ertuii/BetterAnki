@@ -111,4 +111,5 @@
   .del { color: var(--m-red); }
   .empty { border: 1px dashed var(--rule-2); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 6px; }
   .empty p { font-size: 14px; max-width: 62ch; }
+  @media (max-width: 720px) { .inbox { padding: 20px 16px 40px; } .fname { display: block; min-width: 0; } .actions { flex-wrap: wrap; } }
 </style>

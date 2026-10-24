@@ -16,6 +16,7 @@
 <style>
   html,body{margin:0;min-height:100%}
   body{padding:56px 40px;font-family:system-ui,sans-serif;font-size:20px;line-height:1.5}
+  @media (max-width:600px){body{padding:28px 18px}}
   .card.nightMode{color:#ecebe6;background-color:#222326}
   img{max-width:100%;height:auto}
   hr#answer{border:0;border-top:1px solid #8884;margin:28px 0}

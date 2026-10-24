@@ -289,4 +289,19 @@
   .notice { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border-radius: 12px; background: var(--paper-2); font-size: 14px; max-width: 860px; }
   .notice .row { display: flex; gap: 8px; align-items: center; }
   .notice select { width: auto; }
+  @media (max-width: 720px) {
+    .today { padding: 20px 16px 32px; gap: 22px; }
+    header { gap: 18px; }
+    dl { gap: 20px; width: 100%; }
+    dt { font-size: 17px; }
+    dd { font-size: 12px; }
+    .actions { margin-left: 0; width: 100%; }
+    .actions button { flex: 1 1 0; min-width: 0; justify-content: center; }
+    th { font-size: 11px; padding-left: 4px; padding-right: 4px; }
+    td { padding: 8px 4px; font-size: 15px; }
+    .row-actions > button:first-child { display: none; } /* tapping the deck name starts studying */
+    .warn { display: none; }
+    .new-deck input { width: 100%; }
+    .ff .wide { grid-column: auto; }
+  }
 </style>
