@@ -1,3 +1,7 @@
+<script module>
+  const cache = new Map() // last result per deck and period: shown at once next time, then refreshed
+</script>
+
 <script>
   import { api } from './api.js'
   import Bars from './Bars.svelte'
@@ -37,8 +41,12 @@
   const BUTTONS = ['Nochmal', 'Schwer', 'Gut', 'Einfach']
 
   async function load() {
+    const key = `${deckId}:${days}`
+    s = cache.get(key) ?? null
     try {
-      s = await api.statistics(deckId || null, days)
+      const fresh = await api.statistics(deckId || null, days)
+      cache.set(key, fresh)
+      if (key === `${deckId}:${days}`) s = fresh
     } catch (e) {
       notify(String(e?.message ?? e), true)
     }
@@ -185,6 +193,19 @@
           </tbody>
         </table>
       </section>
+    </div>
+  {:else}
+    <div class="facts" aria-busy="true" aria-label="Statistik wird geladen">
+      {#each Array(5) as _}<div><span class="skel" style="width:64px;height:30px"></span><span class="skel" style="width:90px;height:12px;margin-top:8px"></span></div>{/each}
+    </div>
+    <div class="grid" aria-hidden="true">
+      {#each Array(4) as _, i}
+        <section class:wide={i < 2}>
+          <span class="skel" style="width:140px;height:18px"></span>
+          <span class="skel" style="width:260px;max-width:100%;height:12px"></span>
+          <span class="skel" style="height:{i < 2 ? 160 : 110}px;margin-top:8px"></span>
+        </section>
+      {/each}
     </div>
   {/if}
 </div>

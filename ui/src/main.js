@@ -13,6 +13,8 @@ if (import.meta.env.MODE === 'web') {
     await open(data.session.user.id)
     await import('./lib/theme.js')
     mount(App, { target })
+    // the worker loads the collection once per server instance: do it now, not when statistics are first opened
+    setTimeout(() => import('./web/core.js').then((c) => c.worker('warm')).catch(() => {}), 1500)
   } else {
     const { default: Login } = await import('./lib/Login.svelte')
     mount(Login, { target })

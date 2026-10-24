@@ -84,11 +84,22 @@ def entry_for(uid: str) -> Entry:
         return e
 
 
+_users: dict[str, tuple[str, float]] = {}  # token -> (user id, checked until)
+USER_TTL = 300  # ponytail: a revoked token works up to 5 more minutes here; Supabase tokens live an hour anyway
+
+
 def user_of(token: str) -> str:
+    hit = _users.get(token)
+    if hit and hit[1] > time.time():
+        return hit[0]
     try:
-        return cloud._http("GET", "/auth/v1/user", token=token)["id"]
+        uid = cloud._http("GET", "/auth/v1/user", token=token)["id"]
     except (cloud.CloudError, KeyError, TypeError):
         raise PermissionError("Nicht angemeldet") from None
+    if len(_users) > 1000:
+        _users.clear()
+    _users[token] = (uid, time.time() + USER_TTL)
+    return uid
 
 
 # ---------- files: uploads come in through storage, exports go out the same way ----------
@@ -139,13 +150,15 @@ def fetch_media_for(core: Core, token: str, uid: str, deck_id: int | None):
 
 
 def run(token: str, method: str, args: list):
-    if method not in ALLOWED:
+    if method not in ALLOWED and method != "warm":
         raise ValueError(f"Gibt es im Web nicht: {method}")
     uid = user_of(token)
     e = entry_for(uid)
     with e.lock:
         e.account.access = token
         cloud.sync(e.core._col, e.account)
+        if method == "warm":  # the web app opening: load the collection here before the first real call needs it
+            return None
         tmp = Path(tempfile.mkdtemp())
         try:
             exports = []  # (storage name, local path)

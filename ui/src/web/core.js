@@ -607,6 +607,10 @@ export async function plan_next() {
 
 // ---------- the worker: Anki's engine for the rarer actions ----------
 
+// these only read: the web has nothing new to pull afterwards
+const READS = new Set(['warm', 'statistics', 'weak_spots', 'difficult_cards', 'card_info', 'deck_options', 'notetype',
+  'preview_template', 'inspect_import', 'search'])
+
 export async function worker(method, args = []) {
   await flush() // the worker must see everything done here
   const { data } = await sb.auth.getSession()
@@ -621,7 +625,7 @@ export async function worker(method, args = []) {
     throw new Error('Der Server ist gerade nicht erreichbar. Bitte versuch es gleich noch einmal.')
   }
   if (body.error) throw new Error(body.error)
-  await pull() // and the web what the worker changed
+  if (!READS.has(method)) await pull() // and the web what the worker changed
   if (method.startsWith('export_')) await download(String(args[0]))
   return body.result
 }

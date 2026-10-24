@@ -173,3 +173,8 @@ th:first-child, td:first-child { text-align: left; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* placeholder while the worker answers (statistics, deck options) */
+.skel { background: var(--paper-3); border-radius: var(--radius); animation: skel 1.4s ease-in-out infinite; }
+@keyframes skel { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }

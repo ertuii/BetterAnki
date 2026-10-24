@@ -81,17 +81,17 @@ export async function open(userId) {
 export async function pull() {
   await flush()
   let n = 0, max = usn
-  for (const t of TABLES) {
-    let after = usn
-    for (;;) {
+  const fetched = await Promise.all(TABLES.map(async (t) => { // one request per table, all at once
+    const rows = []
+    for (let after = usn; ;) {
       const { data, error } = await sb.from(t).select('*').gt('usn', after).neq('device', device).order('usn').limit(1000)
       if (error) throw new Error(error.message)
-      for (const r of data) take(t, r)
-      n += data.length
+      rows.push(...data)
       if (data.length) after = max = Math.max(max, data[data.length - 1].usn)
-      if (data.length < 1000) break
+      if (data.length < 1000) return rows
     }
-  }
+  }))
+  TABLES.forEach((t, i) => { for (const r of fetched[i]) take(t, r); n += fetched[i].length }) // in TABLES order, note types before notes
   usn = max
   if (n) persist()
   return n

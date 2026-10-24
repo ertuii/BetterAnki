@@ -330,18 +330,19 @@ def sync(col, account: Account, pull: bool = True) -> dict:
         return {"sent": _push(col, account.token(), d["device"], crt=False), "received": 0}
     token = account.token()
     d = account.load()
-    state = _http("GET", "/rest/v1/sync_state?select=usn,schema", token=token)
+    since = d.get("last_usn") or 0
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(len(TABLES) + 1) as pool:  # the schema check and one request per table, all at once
+        state = pool.submit(_http, "GET", "/rest/v1/sync_state?select=usn,schema", token=token)
+        pulled = dict(zip(TABLES, pool.map(lambda t: _pull(token, t, since, d["device"]), TABLES)))
+        state = state.result()
     if state and state[0]["schema"] > SCHEMA:
         raise CloudError("Bitte aktualisiere Muisti, um mit deinem Konto zu synchronisieren.")
     first = d.get("last_usn") is None
     if first:  # everything here is new to the account; what the pull brings in is marked as synced
         for t in LOCAL_TABLES:
             col.db.execute(f"update {t} set usn = -1")
-    since = d.get("last_usn") or 0
-    from concurrent.futures import ThreadPoolExecutor
-
-    with ThreadPoolExecutor(len(TABLES)) as pool:  # one request per table, all at once
-        pulled = dict(zip(TABLES, pool.map(lambda t: _pull(token, t, since, d["device"]), TABLES)))
     received = _apply(col, pulled, first)
     sent = _push(col, token, d["device"], crt=first and not any(r["key"] == "_crt" for r in pulled["config"]))
     # not the newest usn online: another device may have written since, and our own rows are skipped anyway

@@ -255,6 +255,14 @@
       <button class="ghost" onclick={onBack}>Abbrechen</button>
       <button disabled={saving} onclick={save}>{saving ? 'Speichere …' : 'Speichern'}</button>
     </div>
+  {:else}
+    <span class="skel" style="width:320px;max-width:100%;height:30px" aria-busy="true" aria-label="Optionen werden geladen"></span>
+    {#each [1, 4, 3] as rows}
+      <section aria-hidden="true">
+        <span class="skel" style="width:160px;height:18px"></span>
+        {#each Array(rows) as _}<span class="skel" style="height:var(--control-h)"></span>{/each}
+      </section>
+    {/each}
   {/if}
 </div>
 
