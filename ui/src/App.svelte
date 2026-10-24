@@ -233,7 +233,7 @@
   .badge:empty { display: none; }
   .foot { color: var(--ink-2); }
   .foot.on { color: var(--ink); }
-  main { overflow: auto; min-width: 0; }
+  main { overflow: auto; overflow-x: clip; min-width: 0; } /* never scroll the whole page sideways */
   .page { padding: 32px 40px; max-width: 880px; display: flex; flex-direction: column; gap: 24px; }
   h1 { font-size: 26px; font-weight: 750; letter-spacing: -0.02em; }
   .toast {
@@ -247,8 +247,8 @@
   .drop span { font-size: 14px; font-weight: 500; color: var(--ink-2); }
   .toast.error { background: var(--m-red); color: #fff; }
   @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
-  /* phones: the rail becomes a tab bar at the bottom; decks are listed on "Heute" anyway */
-  @media (max-width: 720px) {
+  /* phones and portrait tablets: the rail becomes a tab bar at the bottom; decks are listed on "Heute" anyway */
+  @media (max-width: 860px) {
     .shell, .shell.studying { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
     main { grid-row: 1; }
     aside {

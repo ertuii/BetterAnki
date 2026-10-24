@@ -150,12 +150,12 @@
   <section>
     <table>
       <thead>
-        <tr><th>Stapel</th><th>Neu</th><th>Lernen</th><th>Wiederholen</th><th class="w"></th></tr>
+        <tr><th>Stapel</th><th>Neu</th><th>Lernen</th><th><span class="long">Wiederholen</span><span class="short">Wdh.</span></th><th class="w"></th></tr>
       </thead>
       <tbody>
         {#each rows as d (d.id)}
           <tr>
-            <td>
+            <td class="name-cell">
               <span class="deck" style:padding-left="{d.depth * 22}px">
                 {#if d.children.length}
                   <button class="plain twist" class:open={!d.collapsed} aria-label={d.collapsed ? 'Aufklappen' : 'Zuklappen'}
@@ -254,7 +254,14 @@
   .twist { width: 26px; height: 26px; padding: 0; justify-content: center; flex: none; }
   .twist :global(svg) { transition: transform 160ms var(--ease); }
   .twist.open :global(svg) { transform: rotate(90deg); }
-  .dname { color: var(--ink); font-size: 15px; font-weight: 500; padding: 4px 6px; }
+  /* the deck column takes what's left; long names wrap instead of widening the table */
+  .name-cell { width: 100%; min-width: 9em; }
+  .deck { min-width: 0; }
+  .dname {
+    color: var(--ink); font-size: 15px; font-weight: 500; padding: 4px 6px;
+    height: auto; min-height: 30px; min-width: 0; white-space: normal; text-align: left; line-height: 1.3; overflow-wrap: break-word;
+  }
+  .short { display: none; }
   .dname.top { font-weight: 650; }
   td { font-size: 16px; padding: 10px 12px; }
   .c-new { color: var(--new); font-weight: 650; }
@@ -298,6 +305,8 @@
     .actions { margin-left: 0; width: 100%; }
     .actions button { flex: 1 1 0; min-width: 0; justify-content: center; }
     th { font-size: 11px; padding-left: 4px; padding-right: 4px; }
+    .long { display: none; }
+    .short { display: inline; }
     td { padding: 8px 4px; font-size: 15px; }
     .row-actions > button:first-child { display: none; } /* tapping the deck name starts studying */
     .warn { display: none; }
