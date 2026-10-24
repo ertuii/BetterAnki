@@ -1,7 +1,10 @@
-// Bridge to Python (pywebview js_api = Core). Every call returns a Promise.
+// Bridge to the core: Python via pywebview (js_api = Core) on the desktop, src/web/core.js in the web build
+// (vite --mode web). Every call returns a Promise.
+export const web = import.meta.env.MODE === 'web'
+const webCore = web ? import('../web/core.js') : null // not in the desktop bundle
 const pw = () => /** @type {any} */ (window).pywebview
 
-const ready = new Promise((resolve) => {
+const ready = web ? Promise.resolve() : new Promise((resolve) => {
   if (pw()?.api) resolve()
   else window.addEventListener('pywebviewready', resolve, { once: true })
 })
@@ -9,6 +12,11 @@ const ready = new Promise((resolve) => {
 /** @type {any} */
 export const api = new Proxy({}, {
   get: (_, name) => async (...args) => {
+    if (web) {
+      const core = await webCore
+      if (typeof core[name] !== 'function') throw new Error('Gibt es im Web noch nicht, nutze dafür die Desktop-App.')
+      return core[name](...args)
+    }
     await ready
     return pw().api[name](...args)
   },

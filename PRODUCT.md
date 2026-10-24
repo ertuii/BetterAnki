@@ -19,7 +19,7 @@ A full Anki clone that keeps Anki's scheduling and file compatibility (.apkg, FS
 Anki's real engine with an AI author attached: Claude writes cards straight into the local collection, the app is where you review them.
 
 ## Operating Context
-Daily review sessions on a laptop, both during the day (library/university) and in the evening; theme follows the OS light/dark setting. All data stays on the laptop (no cloud database). Keyboard-driven review (Space to reveal, 1–4 to answer).
+Daily review sessions on a laptop, both during the day (library/university) and in the evening; theme follows the OS light/dark setting. The collection lives on the laptop; with an optional Muisti account it is also synced row by row to Supabase, for the web app (Vercel) and other computers. Keyboard-driven review (Space to reveal, 1–4 to answer).
 
 ## Capabilities and Constraints
 - Decks with subdecks, due counts (new / learning / review), study screen, add/edit notes, browser with Anki search syntax, suspend/flag/move, undo, .apkg/CSV import, .apkg export.

@@ -455,6 +455,9 @@ class Core:
     def sync_login(self, username: str, password: str) -> None:
         import json
 
+        if self.cloud_account():
+            raise ValueError("Bitte zuerst vom Muisti-Konto abmelden: beide Synchronisierungen zusammen bringen den Lernstand durcheinander.")
+
         auth = self._col.sync_login(username=username, password=password, endpoint=None)
         f = data_dir() / self._SYNC_FILE
         f.write_text(json.dumps({"hkey": auth.hkey, "endpoint": auth.endpoint, "username": username}))
@@ -491,6 +494,44 @@ class Core:
             self._col.reopen(after_full_sync=True)
             self._current = None
         self._col.sync_media(auth)
+
+    # ---------- Muisti account (sync with the web app) ----------
+
+    def _cloud(self):
+        from .cloud import Account
+
+        return Account(data_dir())
+
+    def cloud_account(self) -> str | None:
+        d = self._cloud().load()
+        return d and d["email"]
+
+    def cloud_login(self, email: str, password: str) -> None:
+        if self.sync_account():
+            raise ValueError("Bitte zuerst von AnkiWeb abmelden: beide Synchronisierungen zusammen bringen den Lernstand durcheinander.")
+        self._cloud().login(email.strip(), password)
+
+    def cloud_register(self, email: str, password: str) -> bool:
+        """True: signed in. False: Supabase sent a confirmation mail first, sign in afterwards."""
+        if self.sync_account():
+            raise ValueError("Bitte zuerst von AnkiWeb abmelden: beide Synchronisierungen zusammen bringen den Lernstand durcheinander.")
+        return self._cloud().register(email.strip(), password)
+
+    def cloud_logout(self) -> None:
+        self._cloud().logout()
+
+    @_locked
+    def cloud_sync(self) -> dict:
+        from . import cloud
+
+        acc = self._cloud()
+        if not acc.load():
+            return {"sent": 0, "received": 0}
+        out = cloud.sync(self._col, acc)
+        out["media"] = cloud.sync_media(self._col, acc)
+        if out["received"]:
+            self._current = self._typed = None
+        return out
 
     # ---------- studying ----------
 

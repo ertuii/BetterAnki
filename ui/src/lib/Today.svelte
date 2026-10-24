@@ -1,6 +1,6 @@
 <script>
   import { ChevronRight, Ellipsis } from '@lucide/svelte'
-  import { api, hueFor, total } from './api.js'
+  import { api, hueFor, total, web } from './api.js'
   import Strip from './Strip.svelte'
   import AnkiMigration from './AnkiMigration.svelte'
 
@@ -115,8 +115,12 @@
   {#if empty}
     <section class="welcome">
       <h2>Schon Karten in Anki?</h2>
-      <p class="muted">Übernimm deine Sammlung mit Lernstand. Oder ziehe eine .apkg- oder .colpkg-Datei ins Fenster, bzw. bitte Claude, Karten zu erstellen.</p>
-      <AnkiMigration {notify} compact onDone={() => { empty = false; run(async () => {}) }} />
+      {#if web}
+        <p class="muted">Lade die <a href="https://github.com/ertuii/Muisti/releases/latest">Desktop-App</a>, übernimm dort deine Anki-Sammlung und melde dich unter Einstellungen mit diesem Konto an. Danach sind deine Karten auch hier.</p>
+      {:else}
+        <p class="muted">Übernimm deine Sammlung mit Lernstand. Oder ziehe eine .apkg- oder .colpkg-Datei ins Fenster, bzw. bitte Claude, Karten zu erstellen.</p>
+        <AnkiMigration {notify} compact onDone={() => { empty = false; run(async () => {}) }} />
+      {/if}
     </section>
   {/if}
 
@@ -140,7 +144,7 @@
   {/if}
 
   {#if overview}
-    <Strip past={overview.past} future={overview.future} exams={overview.exams} {onPrelearn} />
+    <Strip past={overview.past} future={overview.future} exams={overview.exams} onPrelearn={web ? null : onPrelearn} />
   {/if}
 
   <section>
@@ -184,9 +188,9 @@
                         <button class="plain" onclick={() => { menuFor = null; run(() => api.rebuild_filtered_deck(d.id), (n) => `${n} Karten gesammelt`) }}>Neu aufbauen</button>
                         <button class="plain" onclick={() => { menuFor = null; run(() => api.empty_filtered_deck(d.id), 'Karten zurück in ihre Stapel') }}>Leeren</button>
                       {:else}
-                        <button class="plain" onclick={() => onOptions(d)}>Optionen</button>
+                        {#if !web}<button class="plain" onclick={() => onOptions(d)}>Optionen</button>{/if}
                         <button class="plain" onclick={() => { creating = true; newName = d.name + '::'; menuFor = null }}>Unterstapel anlegen</button>
-                        <button class="plain" onclick={() => exportDeck(d)}>Als .apkg exportieren</button>
+                        {#if !web}<button class="plain" onclick={() => exportDeck(d)}>Als .apkg exportieren</button>{/if}
                         <button class="plain del" onclick={() => reset(d)} title="Alle Karten (auch in Unterstapeln) werden wieder neu, Lernverlauf bleibt in der Statistik">
                           {confirmReset === d.id ? 'Wirklich alles zurücksetzen?' : 'Lernstand zurücksetzen'}
                         </button>
@@ -211,7 +215,7 @@
           onkeydown={(e) => e.key === 'Enter' ? create() : e.key === 'Escape' && (creating = false)} onblur={create} />
       {:else if !filtered}
         <button class="ghost" onclick={() => (creating = true)}>Neuer Stapel</button>
-        <button class="ghost" onclick={() => (filtered = { name: 'Gefilterter Stapel', search: 'is:due', limit: 100, order: 1, resched: true })}>Gefilterter Stapel</button>
+        {#if !web}<button class="ghost" onclick={() => (filtered = { name: 'Gefilterter Stapel', search: 'is:due', limit: 100, order: 1, resched: true })}>Gefilterter Stapel</button>{/if}
       {/if}
     </div>
     {#if filtered}

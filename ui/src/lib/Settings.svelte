@@ -1,11 +1,16 @@
 <script>
   import { Copy } from '@lucide/svelte'
-  import { api } from './api.js'
+  import { api, web } from './api.js'
   import AnkiMigration from './AnkiMigration.svelte'
   import { applyTheme } from './theme.js'
 
   let { notify, refresh, checkUpdate } = $props()
 
+  let cloud = $state(null) // e-mail of the Muisti account
+  let cEmail = $state('')
+  let cPass = $state('')
+  let cSyncing = $state(false)
+  let newPass = $state('')
   let account = $state(null)
   let user = $state('')
   let pass = $state('')
@@ -62,6 +67,7 @@
   }
 
   async function load() {
+    cloud = await api.cloud_account()
     ;[account, backups, storage, claude, prefs, cardCount] = await Promise.all([
       api.sync_account(), api.backups(), api.storage(), api.claude_status(), api.preferences(), api.stats().then((s) => s.cards),
     ])
@@ -127,6 +133,49 @@
   }
 
   const fail = (e) => notify(String(e?.message ?? e), true)
+
+  async function cloudLogin(register) {
+    try {
+      if (register && !(await api.cloud_register(cEmail, cPass))) {
+        notify('Fast fertig: Bestätige deine E-Mail über den Link im Postfach und melde dich dann hier an.')
+        return
+      }
+      if (!register) await api.cloud_login(cEmail, cPass)
+      cPass = ''
+      await load()
+      await cloudSync()
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  async function cloudSync() {
+    cSyncing = true
+    try {
+      const r = await api.cloud_sync()
+      notify(r.sent || r.received || r.media ? `Synchronisiert: ${r.sent} gesendet, ${r.received} empfangen` : 'Alles aktuell')
+      await refresh()
+    } catch (e) {
+      fail(e)
+    } finally {
+      cSyncing = false
+    }
+  }
+
+  async function changePassword() {
+    try {
+      await api.change_password(newPass)
+      newPass = ''
+      notify('Passwort geändert')
+    } catch (e) {
+      fail(e)
+    }
+  }
+
+  async function cloudLogout() {
+    await api.cloud_logout()
+    await load()
+  }
 
   async function login() {
     try {
@@ -265,11 +314,13 @@
     </section>
   {/if}
 
+  {#if !web}
   <section>
     <h2>Von Anki übernehmen</h2>
     <p class="muted">Bringt deine Anki-Sammlung mit Lernstand in Muisti. Anki vorher schließen.</p>
     <AnkiMigration {notify} hasCards={cardCount > 0} onDone={async () => { await refresh(); await load() }} />
   </section>
+  {/if}
 
   {#if prefs}
     <section oninput={savePrefs} onchange={savePrefs}>
@@ -312,6 +363,39 @@
   {/if}
 
   <section>
+    <h2>Muisti-Konto</h2>
+    {#if web}
+      <p class="muted">Änderungen gehen sofort online. Was du in der Desktop-App lernst, erscheint hier, sobald sie synchronisiert hat.</p>
+    {:else}
+      <p class="muted">Lernen im Browser und auf mehreren Rechnern: Mit Konto gleicht Muisti deine Karten beim Start, alle paar Minuten und beim Beenden ab.</p>
+    {/if}
+    {#if cloud}
+      <div class="row">
+        <span>Angemeldet als <b>{cloud}</b></span>
+        <button disabled={cSyncing} onclick={cloudSync}>{cSyncing ? 'Synchronisiere …' : 'Jetzt synchronisieren'}</button>
+        <button class="ghost" onclick={cloudLogout}>Abmelden</button>
+      </div>
+      {#if web}
+        <form class="login" onsubmit={(e) => { e.preventDefault(); changePassword() }}>
+          <input type="password" bind:value={newPass} placeholder="Neues Passwort" autocomplete="new-password" aria-label="Neues Passwort" />
+          <button type="submit" class="ghost" disabled={newPass.length < 8}>Passwort ändern</button>
+        </form>
+      {/if}
+    {:else if account}
+      <p class="muted small">Du bist bei AnkiWeb angemeldet. Melde dich dort ab, um stattdessen ein Muisti-Konto zu nutzen.</p>
+    {:else}
+      <form class="login" onsubmit={(e) => { e.preventDefault(); cloudLogin(false) }}>
+        <input type="email" bind:value={cEmail} placeholder="E-Mail" autocomplete="username" aria-label="E-Mail fürs Muisti-Konto" />
+        <input type="password" bind:value={cPass} placeholder="Passwort" autocomplete="current-password" aria-label="Passwort fürs Muisti-Konto" />
+        <button type="submit" disabled={!cEmail || !cPass}>Anmelden</button>
+        <button type="button" class="ghost" disabled={!cEmail || cPass.length < 8} onclick={() => cloudLogin(true)}>Konto erstellen</button>
+      </form>
+      <p class="muted small">Passwort mit mindestens 8 Zeichen. Gespeichert wird nur ein Anmeldeschlüssel.</p>
+    {/if}
+  </section>
+
+  {#if !cloud && !web}
+  <section>
     <h2>AnkiWeb-Synchronisierung</h2>
     <p class="muted">Optional. Hält diese Sammlung mit AnkiWeb und der Anki-App auf dem Handy abgeglichen. Ohne Anmeldung bleibt alles nur auf diesem Laptop.</p>
     {#if account}
@@ -339,7 +423,9 @@
       <p class="muted small">Das Passwort wird nicht gespeichert, nur ein Anmeldeschlüssel von AnkiWeb.</p>
     {/if}
   </section>
+  {/if}
 
+  {#if !web}
   <section>
     <h2>Sicherungen</h2>
     <p class="muted">Beim Beenden sichert Muisti automatisch. Vor jedem Wiederherstellen und jeder Übernahme wird der aktuelle Stand zusätzlich gesichert.</p>
@@ -442,13 +528,15 @@
     {/if}
   </section>
 
+  {/if}
+
   <section>
     <h2>Version</h2>
     <div class="row">
       <span class="num">Muisti {version}</span>
       <button class="ghost sm" disabled={checking} onclick={lookForUpdate}>{checking ? 'Suche …' : 'Nach Updates suchen'}</button>
     </div>
-    <p class="muted small">Die App sucht beim Start selbst nach neuen Versionen. Deine Karten bleiben beim Update unberührt.</p>
+    <p class="muted small">{web ? 'Gibt es eine neue Version, erscheint links „Aktualisieren“: ein Klick lädt die Seite neu.' : 'Die App sucht beim Start selbst nach neuen Versionen. Deine Karten bleiben beim Update unberührt.'}</p>
   </section>
 </div>
 

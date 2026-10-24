@@ -47,6 +47,10 @@ def run():
     finally:
         server.stop()
         try:
+            core.cloud_sync()  # what was learned last makes it online before the laptop closes
+        except Exception:
+            pass  # offline: the next start syncs it
+        try:
             core.backup(force=False)  # Anki's periodic backup: skipped if the last one is recent
         finally:
             core._close()

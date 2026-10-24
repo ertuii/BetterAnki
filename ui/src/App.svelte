@@ -1,6 +1,6 @@
 <script>
   import { CalendarDays, Plus, Search, Download, ChartColumn, Shapes, Settings as Gear, Inbox as InboxIcon, GraduationCap } from '@lucide/svelte'
-  import { api, flatten, hueFor, total } from './lib/api.js'
+  import { api, flatten, hueFor, total, web } from './lib/api.js'
   import Today from './lib/Today.svelte'
   import Study from './lib/Study.svelte'
   import Editor from './lib/Editor.svelte'
@@ -96,6 +96,20 @@
   }
 
   refresh()
+  // Muisti account: on start and every 5 minutes, but never in the middle of a study session
+  async function cloudSync() {
+    if (view.name === 'study') return
+    try {
+      const r = await api.cloud_sync()
+      if (r.received) await refresh()
+    } catch (e) {
+      console.warn('sync', e) // offline is fine, the next round catches up; the settings show errors
+    }
+  }
+  cloudSync()
+  // web: the desktop's changes arrive within a minute, and right away when the tab comes back
+  setInterval(cloudSync, (web ? 1 : 5) * 60 * 1000)
+  if (web) document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && cloudSync())
   // app.py calls this after Claude changed something; an edited note may be the card being studied
   ;/** @type {any} */ (window).__baRefresh = (method) => {
     refresh()
@@ -113,8 +127,8 @@
       <button class="nav" class:on={view.name === 'today'} onclick={() => go('today')}><CalendarDays size={17} />Heute</button>
       <button class="nav" class:on={view.name === 'add'} onclick={() => go('add')}><Plus size={17} />Hinzufügen</button>
       <button class="nav" class:on={view.name === 'browse'} onclick={() => go('browse')}><Search size={17} />Browser</button>
-      <button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>
-      {#if overview?.features.exams}
+      {#if !web}<button class="nav" class:on={view.name === 'stats'} onclick={() => go('stats')}><ChartColumn size={17} />Statistik</button>{/if}
+      {#if overview?.features.exams && !web}
         <button class="nav" class:on={view.name === 'exams'} onclick={() => go('exams')}><GraduationCap size={17} />Prüfungen</button>
       {/if}
       {#if overview?.inbox || view.name === 'inbox'}
@@ -139,9 +153,9 @@
         <button class="sm" disabled={updating} onclick={installUpdate}>{updating ? 'Lade Update …' : 'Aktualisieren'}</button>
       </div>
     {/if}
-    <button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>
+    {#if !web}<button class="nav foot" class:on={view.name === 'notetypes'} onclick={() => go('notetypes')}><Shapes size={17} />Notiztypen</button>{/if}
     <button class="nav foot" class:on={view.name === 'settings'} onclick={() => go('settings')}><Gear size={17} />Einstellungen</button>
-    <button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>
+    {#if !web}<button class="nav foot" onclick={importFile}><Download size={17} />Importieren</button>{/if}
   </aside>
 
   <main>
@@ -174,7 +188,7 @@
 {/if}
 
 <svelte:window
-  ondragover={(e) => { if (!e.dataTransfer?.types.includes('Files')) return; e.preventDefault(); dragging = true }}
+  ondragover={(e) => { if (web || !e.dataTransfer?.types.includes('Files')) return; e.preventDefault(); dragging = true }}
   ondragleave={(e) => !e.relatedTarget && (dragging = false)}
   ondrop={(e) => { e.preventDefault(); dragging = false }} />
 
@@ -233,4 +247,16 @@
   .drop span { font-size: 14px; font-weight: 500; color: var(--ink-2); }
   .toast.error { background: var(--m-red); color: #fff; }
   @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
+  /* phones (web app): the rail becomes a scrollable bar on top; decks are listed on "Heute" anyway */
+  @media (max-width: 720px) {
+    .shell, .shell.studying { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .shell.studying aside { display: none; }
+    aside { flex-direction: row; align-items: center; overflow-x: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--rule); }
+    aside nav { flex-direction: row; }
+    .brand { padding: 0 8px 0 0; }
+    .brand, .nav { white-space: nowrap; width: auto; }
+    .label, .decks { display: none; }
+    .update { margin: 0 8px; flex-direction: row; align-items: center; white-space: nowrap; }
+    .page { padding: 20px 16px; }
+  }
 </style>

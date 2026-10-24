@@ -57,6 +57,21 @@ PyInstaller baut nur für das System, auf dem es läuft. Die Windows-Version ent
 Das Release muss ohne Anmeldung abrufbar sein, das Repo also öffentlich.
 Erste Installation bei Freunden (App ist nicht signiert): Mac – App einmal öffnen, dann *Systemeinstellungen → Datenschutz & Sicherheit → Trotzdem öffnen* (nur Apple-Silicon-Macs, der CI-Build ist arm64); Windows – „Weitere Informationen“ → *Trotzdem ausführen*. Updates danach brauchen das nicht mehr.
 
+## Webapp & Muisti-Konto
+
+Muisti gibt es auch im Browser (Vercel), mit Konto (Supabase Auth). Die Karten liegen dann zusätzlich online, Zeile für Zeile wie in Ankis Datenbank (`supabase/migrations/`), jede Person sieht nur ihre eigenen (RLS).
+
+- **Desktop:** *Einstellungen → Muisti-Konto* anmelden. Muisti gleicht beim Start, alle 5 Minuten und beim Beenden ab. Ankis Regel: Die neuere Änderung gewinnt, gelöschte Karten verschwinden überall, Wiederholungen werden zusammengeführt. AnkiWeb-Sync und Muisti-Konto schließen sich aus.
+- **Web:** Heute, Lernen (FSRS über ts-fsrs bzw. SM-2), Hinzufügen/Bearbeiten, Browser (Teilmenge der Anki-Suche), Eingang. Statistik, Stapel-Optionen, Notiztypen, Bild-Verdeckung, Import/Export und Claude bleiben vorerst in der Desktop-App.
+- Entwicklung: `cd ui && npm run build:web && npx vite preview --mode web --outDir dist-web` (Supabase-Projekt steht in `ui/.env.web`).
+
+**Updates:** Der Tag `v<version>` (siehe *Updates ausrollen*) baut auch die Webapp und stellt sie auf Vercel online; offene Tabs zeigen dann „Aktualisieren“. Einmalig nötig:
+1. GitHub-Secret `VERCEL_TOKEN` (vercel.com → Account Settings → Tokens).
+2. Supabase → Authentication → URL Configuration: *Site URL* = Adresse der Webapp (für Bestätigungs- und Passwort-Mails).
+3. Optional: Secrets `MUISTI_TEST_EMAIL`/`MUISTI_TEST_PASSWORD` (ein bestätigtes Testkonto), dann läuft `tests/test_cloud.py` auch in CI. Achtung: der Test leert die Online-Daten dieses Kontos.
+
+Datenbank-Änderungen kommen als neue Datei nach `supabase/migrations/` und werden vor dem Tag eingespielt (`supabase db push`). Nur ergänzen, nichts umbenennen: ältere Apps synchronisieren weiter. Geht es nicht anders, `sync_state.schema` erhöhen, dann bitten ältere Apps um ein Update statt zu synchronisieren.
+
 ## Website
 
 Die Download-Seite liegt komplett in `site/` (statisches HTML, kein Build) und hat mit der App nichts zu tun. `.github/workflows/pages.yml` veröffentlicht sie auf GitHub Pages, sobald sich etwas in `site/` ändert.
@@ -87,8 +102,8 @@ Unter Windows `Strg` statt `⌘`.
 ## Test
 
 ```sh
-for t in tests/test_*.py; do uv run python $t || break; done
-cd ui && npm run check
+for t in tests/test_*.py; do uv run python $t || break; done   # test_cloud.py braucht MUISTI_TEST_EMAIL/-PASSWORD
+cd ui && npm run check && npm test
 ```
 
 Lizenz: AGPL-3.0 (wie Anki).
